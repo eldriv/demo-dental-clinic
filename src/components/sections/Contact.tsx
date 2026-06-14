@@ -1,10 +1,12 @@
 import { site, contact } from "@/content";
+import { getClinicHoursDisplay } from "@/lib/clinic-settings-store";
 import { AccentHeading } from "@/components/ui/AccentHeading";
 import { FadeIn } from "@/components/ui/FadeIn";
 import { SectionLabel } from "@/components/ui/SectionLabel";
 import { MapPin, Phone, Mail, Clock } from "lucide-react";
 
-export function Contact() {
+export async function Contact() {
+  const hours = await getClinicHoursDisplay();
   return (
     <section id="contact" className="section-padding page-x">
       <div className="section-inner">
@@ -78,9 +80,9 @@ export function Contact() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-dark">Hours</h3>
-                  <p className="mt-1 text-sm text-muted">{site.hours.summary}</p>
+                  <p className="mt-1 text-sm text-muted">{hours.summary}</p>
                   <ul className="mt-2 space-y-1">
-                    {site.hours.schedule.map((item) => (
+                    {hours.schedule.map((item) => (
                       <li key={item.days} className="text-xs text-muted">
                         <span className="font-medium text-gray-700">{item.days}:</span>{" "}
                         {item.hours}

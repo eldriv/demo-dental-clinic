@@ -1,0 +1,23 @@
+/** Default dental services catalog used when config.services is omitted. */
+export const defaultServices = [
+  { id: "general-dentistry", name: "General Dentistry", icon: "stethoscope" },
+  { id: "teeth-cleaning", name: "Teeth Cleaning", icon: "sparkles" },
+  { id: "dental-fillings", name: "Dental Fillings", icon: "shield" },
+  { id: "root-canal", name: "Root Canal Therapy", icon: "heart-pulse" },
+  { id: "tooth-extractions", name: "Tooth Extractions", icon: "scissors" },
+  { id: "dental-crowns", name: "Dental Crowns", icon: "crown" },
+  { id: "dental-bridges", name: "Dental Bridges", icon: "link" },
+  { id: "dental-implants", name: "Dental Implants", icon: "anchor" },
+  { id: "teeth-whitening", name: "Teeth Whitening", icon: "sun" },
+  { id: "invisalign", name: "Invisalign / Clear Aligners", icon: "align-center" },
+  { id: "braces", name: "Braces / Orthodontics", icon: "grid-3x3" },
+  { id: "pediatric", name: "Pediatric Dentistry", icon: "baby" },
+  { id: "gum-disease", name: "Gum Disease Treatment", icon: "activity" },
+  { id: "emergency", name: "Emergency Dental Care", icon: "siren" },
+  { id: "x-rays", name: "Dental X-Rays & Imaging", icon: "scan" },
+  { id: "oral-cancer", name: "Oral Cancer Screening", icon: "search" },
+  { id: "sedation", name: "Sedation Dentistry", icon: "moon" },
+  { id: "veneers", name: "Veneers", icon: "gem" },
+  { id: "dentures", name: "Dentures", icon: "smile" },
+  { id: "tmj", name: "TMJ Treatment", icon: "bone" },
+];

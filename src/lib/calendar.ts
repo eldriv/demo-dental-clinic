@@ -49,11 +49,22 @@ export async function createCalendarEvent(
     const calendar = google.calendar({ version: "v3", auth });
     const { start, end } = parseTimeToDate(booking.date, booking.time);
 
+    const dentistName = booking.assignedDentistName;
+    const descriptionLines = [
+      `Patient: ${booking.name}`,
+      `Email: ${booking.email}`,
+      `Phone: ${booking.phone}`,
+      `Service: ${booking.service}`,
+    ];
+    if (dentistName) {
+      descriptionLines.push(`Dentist: ${dentistName}`);
+    }
+
     const event = await calendar.events.insert({
       calendarId: process.env.GOOGLE_CALENDAR_ID!,
       requestBody: {
         summary: `${booking.service} — ${booking.name}`,
-        description: `Patient: ${booking.name}\nEmail: ${booking.email}\nPhone: ${booking.phone}\nService: ${booking.service}`,
+        description: descriptionLines.join("\n"),
         start: { dateTime: start.toISOString(), timeZone: "America/Toronto" },
         end: { dateTime: end.toISOString(), timeZone: "America/Toronto" },
         location: site.location.full,

@@ -7,10 +7,15 @@ export interface Booking {
   service: string;
   date: string;
   time: string;
-  status: "pending" | "confirmed" | "cancelled" | "rescheduled";
+  status: "pending" | "confirmed" | "cancelled" | "rescheduled" | "declined" | "completed";
   createdAt: string;
   updatedAt: string;
   calendarEventId?: string;
+  /** Set by staff when approving */
+  assignedDentistId?: string;
+  assignedDentistName?: string;
+  /** Set when the patient picks a new date/time from their manage link. */
+  rescheduledByPatient?: boolean;
 }
 
 export interface CreateBookingInput {

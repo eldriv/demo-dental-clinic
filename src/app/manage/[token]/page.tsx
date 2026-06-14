@@ -7,6 +7,8 @@ import { getBookingByToken } from "@/lib/bookings-store";
 import { createMetadata } from "@/lib/seo";
 import { site } from "@/content";
 
+export const dynamic = "force-dynamic";
+
 interface ManagePageProps {
   params: Promise<{ token: string }>;
 }
@@ -21,7 +23,8 @@ export async function generateMetadata({ params }: ManagePageProps) {
 }
 
 export default async function ManagePage({ params }: ManagePageProps) {
-  const { token } = await params;
+  const { token: rawToken } = await params;
+  const token = rawToken.trim();
   const booking = await getBookingByToken(token);
 
   if (!booking) {

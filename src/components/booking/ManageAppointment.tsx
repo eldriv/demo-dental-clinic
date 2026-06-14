@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Loader2, AlertCircle, CheckCircle } from "lucide-react";
-import { booking, site } from "@/content";
+import { site } from "@/content";
 import type { Booking } from "@/lib/bookings";
+import { isRescheduledPatient } from "@/lib/booking-status";
 
 interface ManageAppointmentProps {
   initialBooking: Booking;
@@ -14,17 +15,46 @@ export function ManageAppointment({ initialBooking }: ManageAppointmentProps) {
   const [mode, setMode] = useState<"view" | "reschedule" | "cancel">("view");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
+  const [rescheduleDate, setRescheduleDate] = useState(initialBooking.date);
+  const [rescheduleTime, setRescheduleTime] = useState(initialBooking.time);
+  const [timeSlots, setTimeSlots] = useState<string[]>([]);
+  const [dateClosed, setDateClosed] = useState(false);
+  const [slotsLoading, setSlotsLoading] = useState(false);
 
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const minDate = tomorrow.toISOString().split("T")[0];
 
+  useEffect(() => {
+    if (mode !== "reschedule" || !rescheduleDate) {
+      return;
+    }
+
+    setSlotsLoading(true);
+    const params = new URLSearchParams({
+      date: rescheduleDate,
+      excludeToken: bookingData.token,
+    });
+
+    fetch(`/api/availability?${params}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setDateClosed(Boolean(data.closed));
+        const slots: string[] = data.timeSlots ?? [];
+        setTimeSlots(slots);
+        setRescheduleTime((current) => (slots.includes(current) ? current : slots[0] ?? ""));
+      })
+      .catch(() => {
+        setTimeSlots([]);
+        setDateClosed(false);
+      })
+      .finally(() => setSlotsLoading(false));
+  }, [mode, rescheduleDate, bookingData.token]);
+
   async function handleReschedule(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setStatus("loading");
     setMessage("");
-
-    const formData = new FormData(e.currentTarget);
 
     try {
       const res = await fetch(`/api/bookings/${bookingData.token}`, {
@@ -32,8 +62,8 @@ export function ManageAppointment({ initialBooking }: ManageAppointmentProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "reschedule",
-          date: formData.get("date"),
-          time: formData.get("time"),
+          date: rescheduleDate,
+          time: rescheduleTime,
         }),
       });
 
@@ -46,7 +76,11 @@ export function ManageAppointment({ initialBooking }: ManageAppointmentProps) {
 
       setBookingData(data.booking);
       setStatus("success");
-      setMessage("Your appointment has been rescheduled.");
+      setMessage(
+        isRescheduledPatient(bookingData) || bookingData.status === "declined"
+          ? "Your new time was submitted. We'll confirm once the clinic approves it."
+          : "Your appointment has been rescheduled."
+      );
       setMode("view");
     } catch {
       setStatus("error");
@@ -85,6 +119,11 @@ export function ManageAppointment({ initialBooking }: ManageAppointmentProps) {
   }
 
   const isCancelled = bookingData.status === "cancelled";
+  const isCompleted = bookingData.status === "completed";
+  const canManage = !isCancelled && !isCompleted;
+  const cannotPickTime =
+    mode === "reschedule" &&
+    (dateClosed || slotsLoading || timeSlots.length === 0);
 
   return (
     <div className="card max-w-lg mx-auto">
@@ -109,18 +148,40 @@ export function ManageAppointment({ initialBooking }: ManageAppointmentProps) {
               ? "bg-red-100 text-red-700"
               : bookingData.status === "pending"
                 ? "bg-amber-100 text-amber-800"
+                : bookingData.status === "declined"
+                  ? "bg-orange-100 text-orange-800"
+                  : bookingData.status === "completed"
+                    ? "bg-gray-100 text-gray-700"
                 : bookingData.status === "rescheduled"
                   ? "bg-blue-100 text-blue-700"
                   : "bg-primary/10 text-primary"
           }`}
         >
-          {bookingData.status === "pending" ? "Pending approval" : bookingData.status}
+          {bookingData.status === "pending"
+            ? "Pending approval"
+            : isRescheduledPatient(bookingData)
+              ? "Rescheduled — pending approval"
+            : bookingData.status === "declined"
+              ? "Reschedule needed"
+              : bookingData.status}
         </span>
       </div>
 
-      {bookingData.status === "pending" && (
+      {(bookingData.status === "pending" || isRescheduledPatient(bookingData)) && (
         <p className="mb-6 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
           Your request is awaiting clinic approval. You&apos;ll receive a confirmation email once approved.
+        </p>
+      )}
+
+      {bookingData.status === "declined" && (
+        <p className="mb-6 rounded-xl bg-orange-50 px-4 py-3 text-sm text-orange-900">
+          Your requested time is not available. Please choose a new date and time below.
+        </p>
+      )}
+
+      {bookingData.status === "completed" && (
+        <p className="mb-6 rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-700">
+          This appointment has been marked as completed. Thank you for visiting us.
         </p>
       )}
 
@@ -132,6 +193,9 @@ export function ManageAppointment({ initialBooking }: ManageAppointmentProps) {
           ["Service", bookingData.service],
           ["Date", bookingData.date],
           ["Time", bookingData.time],
+          ...(bookingData.assignedDentistName || bookingData.assignedDentistId
+            ? [["Dentist", bookingData.assignedDentistName ?? bookingData.assignedDentistId]]
+            : []),
         ].map(([label, value]) => (
           <div key={label} className="flex justify-between gap-4 border-b border-gray-100 pb-3">
             <dt className="text-sm font-medium text-muted">{label}</dt>
@@ -140,7 +204,7 @@ export function ManageAppointment({ initialBooking }: ManageAppointmentProps) {
         ))}
       </dl>
 
-      {!isCancelled && mode === "view" && (
+      {canManage && mode === "view" && (
         <div className="mt-8 flex flex-wrap gap-3">
           <button
             type="button"
@@ -148,6 +212,8 @@ export function ManageAppointment({ initialBooking }: ManageAppointmentProps) {
               setMode("reschedule");
               setStatus("idle");
               setMessage("");
+              setRescheduleDate(bookingData.date);
+              setRescheduleTime(bookingData.time);
             }}
             className="btn-cta flex-1"
           >
@@ -168,7 +234,7 @@ export function ManageAppointment({ initialBooking }: ManageAppointmentProps) {
         </div>
       )}
 
-      {mode === "reschedule" && !isCancelled && (
+      {mode === "reschedule" && canManage && (
         <form onSubmit={handleReschedule} className="mt-8 space-y-4">
           <h3 className="font-semibold text-dark">Reschedule Appointment</h3>
           <div>
@@ -181,9 +247,15 @@ export function ManageAppointment({ initialBooking }: ManageAppointmentProps) {
               type="date"
               required
               min={minDate}
-              defaultValue={bookingData.date}
+              value={rescheduleDate}
+              onChange={(e) => setRescheduleDate(e.target.value)}
               className="input-field"
             />
+            {dateClosed && (
+              <p className="mt-1 text-xs text-red-600">
+                The clinic is closed on this day. Please choose another date.
+              </p>
+            )}
           </div>
           <div>
             <label htmlFor="time" className="mb-1.5 block text-sm font-medium text-gray-700">
@@ -193,10 +265,21 @@ export function ManageAppointment({ initialBooking }: ManageAppointmentProps) {
               id="time"
               name="time"
               required
-              defaultValue={bookingData.time}
-              className="input-field"
+              value={rescheduleTime}
+              onChange={(e) => setRescheduleTime(e.target.value)}
+              disabled={cannotPickTime}
+              className="input-field disabled:opacity-60"
             >
-              {booking.timeSlots.map((slot) => (
+              <option value="">
+                {slotsLoading
+                  ? "Loading times…"
+                  : dateClosed
+                    ? "Closed on this day"
+                    : timeSlots.length === 0
+                      ? "No times available"
+                      : "Select a time"}
+              </option>
+              {timeSlots.map((slot) => (
                 <option key={slot} value={slot}>
                   {slot}
                 </option>
@@ -204,7 +287,11 @@ export function ManageAppointment({ initialBooking }: ManageAppointmentProps) {
             </select>
           </div>
           <div className="flex gap-3">
-            <button type="submit" disabled={status === "loading"} className="btn-cta flex-1">
+            <button
+              type="submit"
+              disabled={status === "loading" || cannotPickTime || !rescheduleTime}
+              className="btn-cta flex-1"
+            >
               {status === "loading" ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (

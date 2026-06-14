@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { Loader2, CheckCircle, AlertCircle } from "lucide-react";
-import { booking, services, site } from "@/content";
+import { services, site } from "@/content";
 import { BOOKING_SERVICE_EVENT } from "@/lib/booking-selection";
 
 interface BookingFormProps {
@@ -15,6 +15,11 @@ export function BookingForm({ className = "" }: BookingFormProps) {
   const [manageUrl, setManageUrl] = useState("");
   const [selectedService, setSelectedService] = useState("");
   const [serviceHighlight, setServiceHighlight] = useState(false);
+  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedTime, setSelectedTime] = useState("");
+  const [timeSlots, setTimeSlots] = useState<string[]>([]);
+  const [dateClosed, setDateClosed] = useState(false);
+  const [slotsLoading, setSlotsLoading] = useState(false);
 
   useEffect(() => {
     const prefill = sessionStorage.getItem("prefillService");
@@ -40,6 +45,31 @@ export function BookingForm({ className = "" }: BookingFormProps) {
     const timer = window.setTimeout(() => setServiceHighlight(false), 2000);
     return () => window.clearTimeout(timer);
   }, [serviceHighlight, selectedService]);
+
+  useEffect(() => {
+    if (!selectedDate) {
+      setTimeSlots([]);
+      setDateClosed(false);
+      setSelectedTime("");
+      return;
+    }
+
+    setSlotsLoading(true);
+    fetch(`/api/availability?date=${encodeURIComponent(selectedDate)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setDateClosed(Boolean(data.closed));
+        setTimeSlots(data.timeSlots ?? []);
+        setSelectedTime((current) =>
+          data.timeSlots?.includes(current) ? current : ""
+        );
+      })
+      .catch(() => {
+        setTimeSlots([]);
+        setDateClosed(false);
+      })
+      .finally(() => setSlotsLoading(false));
+  }, [selectedDate]);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -73,8 +103,12 @@ export function BookingForm({ className = "" }: BookingFormProps) {
 
       setStatus("success");
       setMessage(data.message);
-      if (data.manageUrl) setManageUrl(data.manageUrl);
+      if (data.booking?.token) {
+        setManageUrl(`/manage/${data.booking.token}`);
+      }
       setSelectedService("");
+      setSelectedDate("");
+      setSelectedTime("");
       form.reset();
     } catch {
       setStatus("error");
@@ -88,12 +122,14 @@ export function BookingForm({ className = "" }: BookingFormProps) {
   tomorrow.setDate(tomorrow.getDate() + 1);
   const minDate = tomorrow.toISOString().split("T")[0];
 
+  const cannotBookDate = selectedDate.length > 0 && (dateClosed || timeSlots.length === 0);
+
   return (
     <div className={className}>
       {status === "success" ? (
         <div className="card text-center">
           <CheckCircle className="mx-auto size-12 text-primary" />
-          <h3 className="mt-4 text-lg font-semibold text-dark">Booking Confirmed!</h3>
+          <h3 className="mt-4 text-lg font-semibold text-dark">Request Submitted!</h3>
           <p className="mt-2 text-sm text-muted">{message}</p>
           {manageUrl && (
             <a href={manageUrl} className="btn-cta mt-6 inline-flex">
@@ -192,16 +228,41 @@ export function BookingForm({ className = "" }: BookingFormProps) {
                 type="date"
                 required
                 min={minDate}
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
                 className="input-field"
               />
+              {selectedDate && dateClosed && (
+                <p className="mt-1 text-xs text-red-600">
+                  The clinic is closed on this day. Please choose another date.
+                </p>
+              )}
             </div>
             <div>
               <label htmlFor="time" className="mb-1.5 block text-sm font-medium text-gray-700">
                 Preferred Time *
               </label>
-              <select id="time" name="time" required className="input-field">
-                <option value="">Select a time</option>
-                {booking.timeSlots.map((slot) => (
+              <select
+                id="time"
+                name="time"
+                required
+                value={selectedTime}
+                onChange={(e) => setSelectedTime(e.target.value)}
+                disabled={!selectedDate || slotsLoading || cannotBookDate}
+                className="input-field disabled:opacity-60"
+              >
+                <option value="">
+                  {!selectedDate
+                    ? "Select a date first"
+                    : slotsLoading
+                      ? "Loading times…"
+                      : dateClosed
+                        ? "Closed on this day"
+                        : timeSlots.length === 0
+                          ? "No times available"
+                          : "Select a time"}
+                </option>
+                {timeSlots.map((slot) => (
                   <option key={slot} value={slot}>
                     {slot}
                   </option>
@@ -219,7 +280,7 @@ export function BookingForm({ className = "" }: BookingFormProps) {
 
           <button
             type="submit"
-            disabled={status === "loading"}
+            disabled={status === "loading" || slotsLoading || cannotBookDate || !selectedTime}
             className="btn-cta w-full disabled:opacity-60"
           >
             {status === "loading" ? (

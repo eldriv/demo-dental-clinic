@@ -1,16 +1,17 @@
 import { NextResponse } from "next/server";
-import { getBookingByToken, updateBooking } from "@/lib/bookings-store";
-import { sendBookingApprovedEmail } from "@/lib/email";
-import { createCalendarEvent } from "@/lib/calendar";
+import { getBookingByToken } from "@/lib/bookings-store";
+import { approveBooking } from "@/lib/admin-bookings";
 import { buildConfirmSuccessPage } from "@/lib/email-templates";
-import { site } from "@/content";
+import { getSiteUrlFromRequest } from "@/lib/site-url";
 
 interface RouteParams {
   params: Promise<{ token: string }>;
 }
 
-export async function GET(_request: Request, { params }: RouteParams) {
-  const { token } = await params;
+export async function GET(request: Request, { params }: RouteParams) {
+  const { token: rawToken } = await params;
+  const token = rawToken.trim();
+  const siteUrl = getSiteUrlFromRequest(request);
   const booking = await getBookingByToken(token);
 
   if (!booking) {
@@ -34,33 +35,23 @@ export async function GET(_request: Request, { params }: RouteParams) {
   }
 
   if (booking.status === "confirmed" || booking.status === "rescheduled") {
-    return new NextResponse(buildConfirmSuccessPage(booking, true), {
+    return new NextResponse(buildConfirmSuccessPage(booking, true, siteUrl), {
       headers: { "Content-Type": "text/html" },
     });
   }
 
-  const calendarResult = await createCalendarEvent(booking);
-  const updates: Parameters<typeof updateBooking>[1] = {
-    status: "confirmed",
-  };
-  if (calendarResult.eventId) {
-    updates.calendarEventId = calendarResult.eventId;
-  }
-
-  const updated = await updateBooking(token, updates);
-  if (!updated) {
+  const result = await approveBooking(token, siteUrl);
+  if (result.error || !result.booking) {
     return new NextResponse(
       `<html><body style="font-family:system-ui;max-width:520px;margin:40px auto;padding:20px;text-align:center;">
         <h1>Confirmation Failed</h1>
-        <p>Unable to confirm this booking. Please try again or contact ${site.contact.phones[0]}.</p>
+        <p>${result.error ?? "Unable to confirm this booking."}</p>
       </body></html>`,
-      { headers: { "Content-Type": "text/html" }, status: 500 }
+      { headers: { "Content-Type": "text/html" }, status: 400 }
     );
   }
 
-  await sendBookingApprovedEmail(updated);
-
-  return new NextResponse(buildConfirmSuccessPage(updated), {
+  return new NextResponse(buildConfirmSuccessPage(result.booking, false, siteUrl), {
     headers: { "Content-Type": "text/html" },
   });
 }

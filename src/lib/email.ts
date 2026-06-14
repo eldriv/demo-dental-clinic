@@ -1,12 +1,13 @@
 import nodemailer from "nodemailer";
 import { site } from "@/content";
 import type { Booking } from "./bookings";
-import { getSiteUrl } from "./site-url";
+import { buildConfirmUrl, buildManageUrl, getSiteUrl } from "./site-url";
 import {
   bookingDetailRows,
   buildBrandedEmail,
   buildClinicNewBookingEmail,
   buildPatientApprovedEmail,
+  buildPatientDeclinedEmail,
   buildPatientRequestEmail,
   formatDisplayDate,
 } from "./email-templates";
@@ -40,14 +41,17 @@ function formatBookingDetails(booking: Booking): string {
 }
 
 export async function sendBookingRequestEmails(
-  booking: Booking
+  booking: Booking,
+  siteUrl?: string
 ): Promise<{ sent: boolean; error?: string }> {
   if (!isSmtpConfigured()) {
     return { sent: false, error: "SMTP not configured" };
   }
 
+  const baseUrl = siteUrl ?? getSiteUrl();
   const transporter = createTransporter();
-  const manageUrl = `${getSiteUrl()}/manage/${booking.token}`;
+  const manageUrl = buildManageUrl(booking.token, baseUrl);
+  const confirmUrl = buildConfirmUrl(booking.token, baseUrl);
   const clinicEmail = process.env.CLINIC_EMAIL!;
 
   try {
@@ -56,15 +60,15 @@ export async function sendBookingRequestEmails(
       to: booking.email,
       subject: `Appointment request received — ${booking.service}`,
       text: `Dear ${booking.name},\n\nWe received your appointment request and will confirm it shortly.\n\n${formatBookingDetails(booking)}\n\nManage your appointment: ${manageUrl}\n\nThank you,\n${site.name}`,
-      html: buildPatientRequestEmail(booking),
+      html: buildPatientRequestEmail(booking, baseUrl),
     });
 
     await transporter.sendMail({
       from: `"${site.name}" <${process.env.SMTP_USER}>`,
       to: clinicEmail,
       subject: `New Booking Request — ${booking.name}`,
-      text: `New appointment request:\n\n${formatBookingDetails(booking)}\n\nConfirm: ${getSiteUrl()}/api/bookings/${booking.token}/confirm`,
-      html: buildClinicNewBookingEmail(booking),
+      text: `New appointment request:\n\n${formatBookingDetails(booking)}\n\nConfirm: ${confirmUrl}`,
+      html: buildClinicNewBookingEmail(booking, baseUrl),
     });
 
     return { sent: true };
@@ -75,14 +79,16 @@ export async function sendBookingRequestEmails(
 }
 
 export async function sendBookingApprovedEmail(
-  booking: Booking
+  booking: Booking,
+  siteUrl?: string
 ): Promise<{ sent: boolean; error?: string }> {
   if (!isSmtpConfigured()) {
     return { sent: false, error: "SMTP not configured" };
   }
 
+  const baseUrl = siteUrl ?? getSiteUrl();
   const transporter = createTransporter();
-  const manageUrl = `${getSiteUrl()}/manage/${booking.token}`;
+  const manageUrl = buildManageUrl(booking.token, baseUrl);
 
   try {
     await transporter.sendMail({
@@ -90,7 +96,36 @@ export async function sendBookingApprovedEmail(
       to: booking.email,
       subject: `Appointment Confirmed — ${site.name}`,
       text: `Dear ${booking.name},\n\nYour appointment has been confirmed.\n\n${formatBookingDetails(booking)}\n\nManage your appointment: ${manageUrl}\n\nThank you,\n${site.name}`,
-      html: buildPatientApprovedEmail(booking),
+      html: buildPatientApprovedEmail(booking, baseUrl),
+    });
+
+    return { sent: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Email send failed";
+    return { sent: false, error: message };
+  }
+}
+
+export async function sendBookingDeclinedEmail(
+  booking: Booking,
+  siteUrl?: string,
+  note?: string
+): Promise<{ sent: boolean; error?: string }> {
+  if (!isSmtpConfigured()) {
+    return { sent: false, error: "SMTP not configured" };
+  }
+
+  const baseUrl = siteUrl ?? getSiteUrl();
+  const transporter = createTransporter();
+  const manageUrl = buildManageUrl(booking.token, baseUrl);
+
+  try {
+    await transporter.sendMail({
+      from: `"${site.name}" <${process.env.SMTP_USER}>`,
+      to: booking.email,
+      subject: `Please reschedule — ${site.name}`,
+      text: `Dear ${booking.name},\n\nYour requested appointment time is not available. Please reschedule using this link: ${manageUrl}\n\n${note ?? ""}\n\nThank you,\n${site.name}`,
+      html: buildPatientDeclinedEmail(booking, baseUrl, note),
     });
 
     return { sent: true };
@@ -101,7 +136,8 @@ export async function sendBookingApprovedEmail(
 }
 
 export async function sendCancellationEmails(
-  booking: Booking
+  booking: Booking,
+  siteUrl?: string
 ): Promise<{ sent: boolean; error?: string }> {
   if (!isSmtpConfigured()) {
     return { sent: false, error: "SMTP not configured" };
@@ -144,14 +180,16 @@ export async function sendCancellationEmails(
 }
 
 export async function sendRescheduleEmails(
-  booking: Booking
+  booking: Booking,
+  siteUrl?: string
 ): Promise<{ sent: boolean; error?: string }> {
   if (!isSmtpConfigured()) {
     return { sent: false, error: "SMTP not configured" };
   }
 
+  const baseUrl = siteUrl ?? getSiteUrl();
   const transporter = createTransporter();
-  const manageUrl = `${getSiteUrl()}/manage/${booking.token}`;
+  const manageUrl = buildManageUrl(booking.token, baseUrl);
   const clinicEmail = process.env.CLINIC_EMAIL!;
 
   try {
@@ -193,6 +231,9 @@ export function isEmailConfigured(): boolean {
 }
 
 /** @deprecated Use sendBookingRequestEmails or sendBookingApprovedEmail */
-export async function sendBookingConfirmationEmails(booking: Booking) {
-  return sendBookingRequestEmails(booking);
+export async function sendBookingConfirmationEmails(
+  booking: Booking,
+  siteUrl?: string
+) {
+  return sendBookingRequestEmails(booking, siteUrl);
 }

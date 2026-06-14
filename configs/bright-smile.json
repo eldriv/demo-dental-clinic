@@ -1,0 +1,114 @@
+{
+  "slug": "bright-smile",
+  "packageName": "bright-smile-dental",
+  "site": {
+    "name": "Bright Smile Dental Clinic",
+    "shortName": "Bright Smile",
+    "tagline": "Gentle care for every smile",
+    "type": "dental clinic",
+    "description": "Neighborhood dental clinic in Makati with online booking, family dentistry, and a friendly front desk team.",
+    "location": {
+      "city": "Makati",
+      "province": "Metro Manila",
+      "country": "Philippines",
+      "address": "456 Ayala Ave, Makati City",
+      "landmark": "Near Greenbelt",
+      "mapEmbedUrl": "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3859.5!2d121.027!3d14.554!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMTTCsDMzJzE0LjQiTiAxMjHCsDAxJzM3LjIiRQ!5e0!3m2!1sen!2sph!4v1",
+      "coordinates": { "lat": 14.554, "lng": 121.027 }
+    },
+    "contact": {
+      "phones": ["0918 555 1234", "02 8123 4567"],
+      "email": "hello@brightsmile.ph",
+      "facebook": "https://facebook.com/brightsmiledental"
+    },
+    "hours": {
+      "summary": "Mon–Sat 8 AM–6 PM",
+      "schedule": [
+        { "days": "Monday – Friday", "hours": "8:00 AM – 6:00 PM" },
+        { "days": "Saturday", "hours": "8:00 AM – 2:00 PM" },
+        { "days": "Sunday", "hours": "Closed" }
+      ]
+    },
+    "social": {
+      "rating": 4.8,
+      "reviewCount": 180,
+      "patientCount": "1,800+"
+    }
+  },
+  "brand": {
+    "primary": "#2563EB",
+    "primaryLight": "#3B82F6",
+    "accent": "#F59E0B",
+    "accentLight": "#FBBF24",
+    "dark": "#1E3A5F",
+    "darkLight": "#2D4A6F",
+    "cream": "#FAF7F2",
+    "surface": "#F4F1EC"
+  },
+  "copy": {
+    "paragraphs": [
+      "Bright Smile is a Makati dental clinic focused on comfortable visits and clear communication.",
+      "Book online, get email confirmations, and manage appointments without long phone waits.",
+      "From cleanings to cosmetic work, our team treats every patient like a neighbor."
+    ],
+    "short": "Modern dental care in Makati with online booking.",
+    "medium": "Visit a clinic built for busy professionals — online scheduling, friendly staff, and quality care.",
+    "long": "Bright Smile Dental Clinic offers general, cosmetic, and family dentistry in the heart of Makati. Our front desk confirms bookings quickly and our dentists take time to explain every treatment option.",
+    "quote": "Fast booking, clean clinic, and the dentist was very gentle. Will come back for my next cleaning.",
+    "hero": {
+      "titleLine1": "Your Makati Dentist",
+      "titleAccent": "for the Whole Family",
+      "titleLine2": "Book Online in Minutes"
+    },
+    "about": {
+      "title": "Trusted Care in",
+      "titleAccent": "Makati",
+      "titleEnd": "Since 2010",
+      "stats": [
+        { "value": 14, "suffix": "+", "label": "Years of Experience" },
+        { "value": 1800, "suffix": "+", "label": "Happy Patients" },
+        { "value": 18, "suffix": "", "label": "Dental Services" },
+        { "value": 97, "suffix": "%", "label": "Patient Satisfaction" }
+      ]
+    },
+    "team": [
+      {
+        "id": "dr-reyes",
+        "name": "Dr. Ana Reyes",
+        "role": "Lead Dentist",
+        "bio": "General and cosmetic dentistry with 12 years of experience."
+      },
+      {
+        "id": "dr-santos",
+        "name": "Dr. Miguel Santos",
+        "role": "Orthodontist",
+        "bio": "Braces and clear aligner specialist."
+      }
+    ],
+    "testimonials": [
+      {
+        "id": "t1",
+        "text": "Very professional and the online booking actually worked smoothly.",
+        "author": "Carla R.",
+        "service": "Teeth Cleaning",
+        "rating": 5
+      },
+      {
+        "id": "t2",
+        "text": "Great for working folks — early hours and quick appointments.",
+        "author": "Mark T.",
+        "service": "General Dentistry",
+        "rating": 5
+      }
+    ]
+  },
+  "admin": {
+    "owner": { "name": "Dr. Ana Reyes" },
+    "staff": { "name": "Front Desk" }
+  },
+  "env": {
+    "siteUrl": "http://localhost:3000",
+    "clinicEmail": "hello@brightsmile.ph",
+    "devPasswordHint": "change-me-in-env"
+  }
+}

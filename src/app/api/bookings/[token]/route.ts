@@ -8,14 +8,20 @@ import {
   updateCalendarEvent,
   deleteCalendarEvent,
 } from "@/lib/calendar";
+import { getSiteUrlFromRequest } from "@/lib/site-url";
 import { site } from "@/content";
+import { getClinicSettings } from "@/lib/clinic-settings-store";
+import { getAllScheduleBlocks } from "@/lib/schedule-blocks";
+import { getAllBookings } from "@/lib/bookings-store";
+import { validateSlotBooking } from "@/lib/booking-availability";
 
 interface RouteParams {
   params: Promise<{ token: string }>;
 }
 
 export async function GET(_request: Request, { params }: RouteParams) {
-  const { token } = await params;
+  const { token: rawToken } = await params;
+  const token = rawToken.trim();
   const booking = await getBookingByToken(token);
 
   if (!booking) {
@@ -26,7 +32,9 @@ export async function GET(_request: Request, { params }: RouteParams) {
 }
 
 export async function POST(request: Request, { params }: RouteParams) {
-  const { token } = await params;
+  const { token: rawToken } = await params;
+  const token = rawToken.trim();
+  const siteUrl = getSiteUrlFromRequest(request);
 
   try {
     const body = await request.json();
@@ -53,7 +61,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         await deleteCalendarEvent(updated.calendarEventId);
       }
 
-      await sendCancellationEmails(updated);
+      await sendCancellationEmails(updated, siteUrl);
 
       return NextResponse.json({
         success: true,
@@ -82,10 +90,30 @@ export async function POST(request: Request, { params }: RouteParams) {
         );
       }
 
+      const [settings, bookings, blocks] = await Promise.all([
+        getClinicSettings(),
+        getAllBookings(),
+        getAllScheduleBlocks(),
+      ]);
+
+      const slotError = validateSlotBooking({
+        date,
+        time,
+        settings,
+        bookings,
+        blocks,
+        excludeToken: token,
+      });
+
+      if (slotError) {
+        return NextResponse.json({ error: slotError }, { status: 400 });
+      }
+
       const updated = await updateBooking(token, {
         date,
         time,
-        status: booking.status === "pending" ? "pending" : "rescheduled",
+        status: "rescheduled",
+        rescheduledByPatient: true,
       });
 
       if (!updated) {
@@ -93,7 +121,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       }
 
       await updateCalendarEvent(updated);
-      await sendRescheduleEmails(updated);
+      await sendRescheduleEmails(updated, siteUrl);
 
       return NextResponse.json({
         success: true,

@@ -14,7 +14,7 @@ const FAQ = dynamic(() =>
   import("@/components/sections/FAQ").then((mod) => mod.FAQ)
 );
 
-export default function Home() {
+export default async function Home() {
   return (
     <>
       <Navbar />

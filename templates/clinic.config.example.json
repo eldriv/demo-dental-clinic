@@ -1,0 +1,127 @@
+{
+  "slug": "smilecare-demo",
+  "packageName": "demo-dental-clinic",
+  "site": {
+    "name": "SmileCare Dental Clinic",
+    "shortName": "SmileCare",
+    "tagline": "Your smile, our passion",
+    "type": "dental clinic",
+    "description": "Family-friendly dental care with online booking, gentle treatment, and a team focused on healthy smiles for every age.",
+    "location": {
+      "city": "Quezon City",
+      "province": "Metro Manila",
+      "country": "Philippines",
+      "address": "123 Commonwealth Ave, Brgy. Holy Spirit, Quezon City",
+      "landmark": "Near SM North EDSA",
+      "mapEmbedUrl": "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3859.5!2d121.043!3d14.676!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMTTCsDQwJzMzLjYiTiAxMjHCsDAyJzM0LjgiRQ!5e0!3m2!1sen!2sph!4v1",
+      "coordinates": { "lat": 14.676, "lng": 121.043 }
+    },
+    "contact": {
+      "phones": ["0917 123 4567", "02 8812 3456"],
+      "email": "hello@smilecare.ph",
+      "facebook": "https://facebook.com/smilecaredental"
+    },
+    "hours": {
+      "summary": "Mon–Sat 9 AM–5 PM, Sunday by appointment",
+      "schedule": [
+        { "days": "Monday – Friday", "hours": "9:00 AM – 5:00 PM" },
+        { "days": "Saturday", "hours": "9:00 AM – 5:00 PM" },
+        { "days": "Sunday", "hours": "By appointment only" }
+      ]
+    },
+    "social": {
+      "rating": 4.9,
+      "reviewCount": 240,
+      "patientCount": "2,500+"
+    }
+  },
+  "brand": {
+    "primary": "#3B7A5C",
+    "primaryLight": "#4A9A72",
+    "accent": "#D4729B",
+    "accentLight": "#E8A0BF",
+    "dark": "#1A3C34",
+    "darkLight": "#2A5248",
+    "cream": "#FAF7F2",
+    "surface": "#F4F1EC"
+  },
+  "copy": {
+    "paragraphs": [
+      "We are a neighborhood dental clinic built around comfort, clarity, and consistent care. From check-ups to cosmetic work, our team explains every step in plain language.",
+      "Our reception desk confirms appointments quickly, and patients can book or reschedule online anytime. We treat families, professionals, and first-time visitors with the same attention.",
+      "Whether you need a cleaning, filling, braces consult, or emergency visit, we focus on gentle treatment and long-term oral health."
+    ],
+    "short": "Professional dental care with online booking and friendly staff.",
+    "medium": "Book appointments online, get email confirmations, and visit a clinic designed for busy families and working professionals.",
+    "long": "Our clinic combines modern dentistry with a warm, local feel. Online booking, clear pricing conversations, and a staff dashboard keep visits organized from first call to follow-up.",
+    "quote": "The team was patient, thorough, and made my first visit easy. Booking online saved me time and the reminders were helpful.",
+    "hero": {
+      "titleLine1": "Healthy Smiles Start",
+      "titleAccent": "Here",
+      "titleLine2": "With Expert Dental Care"
+    },
+    "about": {
+      "title": "Caring for",
+      "titleAccent": "Quezon City",
+      "titleEnd": "One Smile at a Time",
+      "stats": [
+        { "value": 15, "suffix": "+", "label": "Years of Experience" },
+        { "value": 2500, "suffix": "+", "label": "Happy Patients" },
+        { "value": 20, "suffix": "", "label": "Dental Services" },
+        { "value": 98, "suffix": "%", "label": "Patient Satisfaction" }
+      ]
+    },
+    "team": [
+      {
+        "id": "dr-chen",
+        "name": "Dr. Sarah Chen",
+        "role": "Lead Dentist & Founder",
+        "bio": "General and cosmetic dentistry with a focus on patient comfort and clear treatment plans."
+      },
+      {
+        "id": "dr-patel",
+        "name": "Dr. Raj Patel",
+        "role": "Orthodontist",
+        "bio": "Braces and aligner consultations for teens and adults."
+      },
+      {
+        "id": "maria-lopez",
+        "name": "Maria Lopez",
+        "role": "Dental Hygienist",
+        "bio": "Preventive care, cleanings, and oral health education."
+      }
+    ],
+    "testimonials": [
+      {
+        "id": "t1",
+        "text": "Booking was easy and the staff confirmed my slot the same day. Very professional visit.",
+        "author": "Jennifer M.",
+        "service": "Veneers",
+        "rating": 5
+      },
+      {
+        "id": "t2",
+        "text": "Clean clinic, friendly team, and they explained my options without pressure.",
+        "author": "David K.",
+        "service": "General Dentistry",
+        "rating": 5
+      },
+      {
+        "id": "t3",
+        "text": "My kids actually look forward to their check-ups now. Highly recommend.",
+        "author": "Priya S.",
+        "service": "Pediatric Dentistry",
+        "rating": 5
+      }
+    ]
+  },
+  "admin": {
+    "owner": { "name": "Clinic Owner" },
+    "staff": { "name": "Front Desk" }
+  },
+  "env": {
+    "siteUrl": "http://localhost:3000",
+    "clinicEmail": "hello@smilecare.ph",
+    "devPasswordHint": "smilecare2026"
+  }
+}

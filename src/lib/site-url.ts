@@ -38,3 +38,32 @@ export function getSiteUrl(): string {
 
   return "http://localhost:3000";
 }
+
+/** Use the domain the patient actually booked from (matches where data is stored). */
+export function getSiteUrlFromRequest(request: Request): string {
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const host = (forwardedHost ?? request.headers.get("host") ?? "")
+    .split(",")[0]
+    ?.trim();
+
+  if (host) {
+    const [hostname, port] = host.split(":");
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
+      return normalizeUrl(`http://${host}`);
+    }
+    const proto = request.headers.get("x-forwarded-proto") ?? "https";
+    return normalizeUrl(`${proto}://${host}`);
+  }
+
+  return getSiteUrl();
+}
+
+export function buildManageUrl(token: string, siteUrl?: string): string {
+  const base = siteUrl ?? getSiteUrl();
+  return `${base}/manage/${token}`;
+}
+
+export function buildConfirmUrl(token: string, siteUrl?: string): string {
+  const base = siteUrl ?? getSiteUrl();
+  return `${base}/api/bookings/${token}/confirm`;
+}

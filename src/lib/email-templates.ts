@@ -1,7 +1,7 @@
 import { site } from "@/content";
 import { placeholders } from "@/content/placeholders";
 import type { Booking } from "./bookings";
-import { getSiteUrl } from "./site-url";
+import { buildConfirmUrl, buildManageUrl, getSiteUrl } from "./site-url";
 
 const brand = site.brand;
 
@@ -124,7 +124,8 @@ export function buildBrandedEmail(options: EmailLayoutOptions): string {
 }
 
 export function bookingDetailRows(booking: Booking): Array<{ label: string; value: string }> {
-  return [
+  const dentistName = booking.assignedDentistName;
+  const rows = [
     { label: "Patient", value: booking.name },
     { label: "Email", value: booking.email },
     { label: "Phone", value: booking.phone },
@@ -132,10 +133,14 @@ export function bookingDetailRows(booking: Booking): Array<{ label: string; valu
     { label: "Date", value: formatDisplayDate(booking.date) },
     { label: "Time", value: booking.time },
   ];
+  if (dentistName) {
+    rows.push({ label: "Dentist", value: dentistName });
+  }
+  return rows;
 }
 
-export function buildPatientRequestEmail(booking: Booking): string {
-  const manageUrl = `${getSiteUrl()}/manage/${booking.token}`;
+export function buildPatientRequestEmail(booking: Booking, siteUrl?: string): string {
+  const manageUrl = buildManageUrl(booking.token, siteUrl);
 
   return buildBrandedEmail({
     preheader: `We received your appointment request for ${booking.service}.`,
@@ -148,9 +153,9 @@ export function buildPatientRequestEmail(booking: Booking): string {
   });
 }
 
-export function buildClinicNewBookingEmail(booking: Booking): string {
-  const confirmUrl = `${getSiteUrl()}/api/bookings/${booking.token}/confirm`;
-  const manageUrl = `${getSiteUrl()}/manage/${booking.token}`;
+export function buildClinicNewBookingEmail(booking: Booking, siteUrl?: string): string {
+  const confirmUrl = buildConfirmUrl(booking.token, siteUrl);
+  const manageUrl = buildManageUrl(booking.token, siteUrl);
 
   return buildBrandedEmail({
     preheader: `New booking request from ${booking.name} for ${booking.service}.`,
@@ -163,8 +168,8 @@ export function buildClinicNewBookingEmail(booking: Booking): string {
   });
 }
 
-export function buildPatientApprovedEmail(booking: Booking): string {
-  const manageUrl = `${getSiteUrl()}/manage/${booking.token}`;
+export function buildPatientApprovedEmail(booking: Booking, siteUrl?: string): string {
+  const manageUrl = buildManageUrl(booking.token, siteUrl);
 
   return buildBrandedEmail({
     preheader: `Your appointment at ${site.name} has been confirmed.`,
@@ -176,9 +181,33 @@ export function buildPatientApprovedEmail(booking: Booking): string {
   });
 }
 
-export function buildConfirmSuccessPage(booking: Booking, alreadyConfirmed = false): string {
-  const manageUrl = `${getSiteUrl()}/manage/${booking.token}`;
-  const homeUrl = getSiteUrl();
+export function buildPatientDeclinedEmail(
+  booking: Booking,
+  siteUrl?: string,
+  note?: string
+): string {
+  const manageUrl = buildManageUrl(booking.token, siteUrl);
+  const reason = note?.trim()
+    ? note.trim()
+    : "The requested time is no longer available. Please choose a new date and time.";
+
+  return buildBrandedEmail({
+    preheader: `Please reschedule your appointment at ${site.name}.`,
+    heading: "Please Reschedule Your Appointment",
+    intro: `Hi ${booking.name}, ${reason}`,
+    rows: bookingDetailRows(booking),
+    cta: { label: "Choose a New Time", href: manageUrl, color: "accent" },
+    footerNote: "Use the link above to pick a new appointment time that works for you.",
+  });
+}
+
+export function buildConfirmSuccessPage(
+  booking: Booking,
+  alreadyConfirmed = false,
+  siteUrl?: string
+): string {
+  const manageUrl = buildManageUrl(booking.token, siteUrl);
+  const homeUrl = siteUrl ?? getSiteUrl();
 
   return `<!DOCTYPE html>
 <html lang="en">

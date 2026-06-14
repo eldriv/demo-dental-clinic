@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-primary: #3b7a5c;
-  --color-primary-light: #4a9a72;
-  --color-accent: #d4729b;
-  --color-accent-light: #e8a0bf;
-  --color-dark: #1a3c34;
-  --color-dark-light: #2a5248;
-  --color-cream: #faf7f2;
-  --color-surface: #f4f1ec;
+  --color-primary: #3B7A5C;
+  --color-primary-light: #4A9A72;
+  --color-accent: #D4729B;
+  --color-accent-light: #E8A0BF;
+  --color-dark: #1A3C34;
+  --color-dark-light: #2A5248;
+  --color-cream: #FAF7F2;
+  --color-surface: #F4F1EC;
   --color-muted: #6b7280;
   --font-sans: var(--font-plus-jakarta);
   --font-display: var(--font-playfair);
@@ -70,7 +70,100 @@ body {
 }
 
 .btn-outline-danger {
-  @apply border-red-200 text-red-600 hover:border-red-400;
+  @apply border-red-200 text-red-600 hover:border-red-400 hover:bg-red-50;
+}
+
+/* Admin dashboard */
+.admin-layout {
+  @apply min-h-dvh bg-[#eef3f0];
+}
+
+.admin-sidebar {
+  @apply flex w-full shrink-0 flex-col border-b border-dark/10 bg-linear-to-br from-dark via-dark to-dark-light text-white lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 lg:w-64 lg:border-b-0 lg:border-r lg:border-white/10 lg:shadow-xl;
+}
+
+.admin-main {
+  @apply flex min-w-0 flex-1 flex-col lg:pl-64;
+}
+
+.admin-content {
+  @apply mx-auto w-full max-w-6xl flex-1 px-4 py-5 sm:px-6 sm:py-8;
+}
+
+.admin-card {
+  @apply rounded-2xl border border-white/70 bg-white/95 p-5 shadow-[0_8px_30px_rgba(26,60,52,0.06)] ring-1 ring-gray-100/80 backdrop-blur-sm sm:p-6;
+}
+
+.admin-card-muted {
+  @apply rounded-2xl border border-dashed border-gray-200 bg-white/60 p-8 text-center;
+}
+
+.admin-nav-link {
+  @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-white/75 transition-all duration-200 hover:bg-white/10 hover:text-white;
+}
+
+.admin-nav-link-active {
+  @apply bg-white/15 text-white shadow-sm ring-1 ring-white/10;
+}
+
+.admin-stat-card {
+  @apply relative overflow-hidden rounded-2xl border border-white/70 bg-white/95 p-5 shadow-[0_8px_30px_rgba(26,60,52,0.06)] ring-1 ring-gray-100/80 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(26,60,52,0.1)];
+}
+
+.admin-section-title {
+  @apply text-base font-semibold text-dark sm:text-lg;
+}
+
+.admin-page-title {
+  @apply text-2xl font-bold tracking-tight text-dark sm:text-3xl;
+}
+
+.admin-segment {
+  @apply inline-flex rounded-xl bg-white p-1 shadow-sm ring-1 ring-gray-200/80;
+}
+
+.admin-segment-btn {
+  @apply rounded-lg px-4 py-2 text-sm font-medium text-muted transition-all duration-200;
+}
+
+.admin-segment-btn-active {
+  @apply bg-primary text-white shadow-sm;
+}
+
+.admin-badge {
+  @apply inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold;
+}
+
+.admin-info-banner {
+  @apply flex items-start gap-3 rounded-xl border px-4 py-3 text-sm;
+}
+
+.admin-info-banner-blue {
+  @apply border-blue-100 bg-blue-50/80 text-blue-900;
+}
+
+.admin-info-banner-amber {
+  @apply border-amber-100 bg-amber-50/80 text-amber-950;
+}
+
+.admin-detail-grid {
+  @apply grid gap-3 rounded-xl bg-surface/60 p-4 sm:grid-cols-2;
+}
+
+.admin-detail-item {
+  @apply space-y-0.5;
+}
+
+.admin-detail-label {
+  @apply text-[11px] font-semibold uppercase tracking-wider text-muted;
+}
+
+.admin-detail-value {
+  @apply text-sm font-medium text-dark;
+}
+
+.admin-actions-bar {
+  @apply flex flex-wrap gap-2 border-t border-gray-100 pt-4;
 }
 
 .placeholder-cover {

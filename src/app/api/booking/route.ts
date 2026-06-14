@@ -2,12 +2,15 @@ import { NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
 import type { Booking, CreateBookingInput } from "@/lib/bookings";
 import { BOOKING_VALIDATION } from "@/lib/bookings";
-import { saveBooking } from "@/lib/bookings-store";
+import { saveBooking, getAllBookings } from "@/lib/bookings-store";
 import { sendBookingRequestEmails } from "@/lib/email";
-import { getSiteUrl } from "@/lib/site-url";
+import { getSiteUrlFromRequest, buildManageUrl } from "@/lib/site-url";
 import { site } from "@/content";
+import { getClinicSettings } from "@/lib/clinic-settings-store";
+import { getAllScheduleBlocks } from "@/lib/schedule-blocks";
+import { validateSlotBooking } from "@/lib/booking-availability";
 
-function validateBookingInput(body: CreateBookingInput): string | null {
+function validateBookingFields(body: CreateBookingInput): string | null {
   const { name, email, phone, service, date, time } = body;
 
   if (!name?.trim() || name.trim().length < BOOKING_VALIDATION.name.min) {
@@ -29,23 +32,34 @@ function validateBookingInput(body: CreateBookingInput): string | null {
     return "Please select a time.";
   }
 
-  const bookingDate = new Date(date);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  if (bookingDate < today) {
-    return "Please select a future date.";
-  }
-
   return null;
 }
 
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as CreateBookingInput;
-    const validationError = validateBookingInput(body);
+    const fieldError = validateBookingFields(body);
 
-    if (validationError) {
-      return NextResponse.json({ error: validationError }, { status: 400 });
+    if (fieldError) {
+      return NextResponse.json({ error: fieldError }, { status: 400 });
+    }
+
+    const [settings, bookings, blocks] = await Promise.all([
+      getClinicSettings(),
+      getAllBookings(),
+      getAllScheduleBlocks(),
+    ]);
+
+    const slotError = validateSlotBooking({
+      date: body.date,
+      time: body.time,
+      settings,
+      bookings,
+      blocks,
+    });
+
+    if (slotError) {
+      return NextResponse.json({ error: slotError }, { status: 400 });
     }
 
     const now = new Date().toISOString();
@@ -67,8 +81,9 @@ export async function POST(request: Request) {
 
     await saveBooking(booking);
 
-    const emailResult = await sendBookingRequestEmails(booking);
-    const manageUrl = `${getSiteUrl()}/manage/${token}`;
+    const siteUrl = getSiteUrlFromRequest(request);
+    const emailResult = await sendBookingRequestEmails(booking, siteUrl);
+    const manageUrl = buildManageUrl(token, siteUrl);
 
     let message = "Your appointment request has been submitted!";
     if (!emailResult.sent) {

@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "generate": "node scripts/generate-from-config.mjs",
+    "scaffold": "node scripts/scaffold-clinic.mjs",
+    "clinic": "node scripts/make-clinic.mjs",
+    "generate:assets": "python3 scripts/generate-assets.py"
   },
   "dependencies": {
     "@netlify/blobs": "^10.7.9",

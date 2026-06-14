@@ -205,8 +205,35 @@ def draw_og(x, y, w, h):
     return (r, g, b)
 
 
+def parse_color(hex_color: str) -> tuple[int, int, int]:
+    value = hex_color.strip().lstrip("#")
+    if len(value) == 3:
+        value = "".join(ch * 2 for ch in value)
+    if len(value) != 6:
+        raise ValueError(f"Invalid hex color: {hex_color}")
+    return int(value[0:2], 16), int(value[2:4], 16), int(value[4:6], 16)
+
+
 def main():
-    public_dir = os.path.join(os.path.dirname(__file__), "public")
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Generate brand logo and OG image PNGs.")
+    parser.add_argument("--primary", default="#3B7A5C", help="Primary brand color (hex)")
+    parser.add_argument("--accent", default="#D4729B", help="Accent brand color (hex)")
+    parser.add_argument("--dark", default="#1A3C34", help="Dark brand color (hex)")
+    parser.add_argument(
+        "--output",
+        default=os.path.join(os.path.dirname(__file__), "public"),
+        help="Output directory for logo.png and og-image.png",
+    )
+    args = parser.parse_args()
+
+    global PRIMARY, ACCENT, DARK
+    PRIMARY = parse_color(args.primary)
+    ACCENT = parse_color(args.accent)
+    DARK = parse_color(args.dark)
+
+    public_dir = args.output
     os.makedirs(public_dir, exist_ok=True)
 
     logo = create_png(256, 256, draw_logo_fixed)
@@ -217,7 +244,7 @@ def main():
     with open(os.path.join(public_dir, "og-image.png"), "wb") as f:
         f.write(og)
 
-    print("Generated public/logo.png and public/og-image.png")
+    print(f"Generated {public_dir}/logo.png and {public_dir}/og-image.png")
 
 
 if __name__ == "__main__":
