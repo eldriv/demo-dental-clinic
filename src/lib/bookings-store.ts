@@ -1,16 +1,9 @@
 import { getStore } from "@netlify/blobs";
 import type { Booking } from "./bookings";
+import { shouldUseNetlifyBlobs } from "./storage-env";
 
 const BLOB_STORE = "bookings";
 const BLOB_KEY = "all-bookings";
-
-function isNetlifyProduction(): boolean {
-  return (
-    process.env.NETLIFY === "true" ||
-    Boolean(process.env.NETLIFY_BLOBS_CONTEXT) ||
-    Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME)
-  );
-}
 
 async function readLocalBookings(): Promise<Booking[]> {
   const fs = await import("fs/promises");
@@ -48,14 +41,14 @@ async function writeBlobBookings(bookings: Booking[]): Promise<void> {
 }
 
 export async function getAllBookings(): Promise<Booking[]> {
-  if (isNetlifyProduction()) {
+  if (shouldUseNetlifyBlobs()) {
     return readBlobBookings();
   }
   return readLocalBookings();
 }
 
 export async function saveAllBookings(bookings: Booking[]): Promise<void> {
-  if (isNetlifyProduction()) {
+  if (shouldUseNetlifyBlobs()) {
     await writeBlobBookings(bookings);
   } else {
     await writeLocalBookings(bookings);

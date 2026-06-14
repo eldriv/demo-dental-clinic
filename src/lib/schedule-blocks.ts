@@ -1,19 +1,12 @@
 import { getStore } from "@netlify/blobs";
 
 import type { ScheduleBlock } from "@/lib/schedule-block-utils";
+import { shouldUseNetlifyBlobs } from "@/lib/storage-env";
 export type { ScheduleBlock } from "@/lib/schedule-block-utils";
 export { isDateBlocked, isClinicWideDateBlocked, getDentistLeaveNotes } from "@/lib/schedule-block-utils";
 
 const BLOB_STORE = "bookings";
 const BLOB_KEY = "schedule-blocks";
-
-function isNetlifyProduction(): boolean {
-  return (
-    process.env.NETLIFY === "true" ||
-    Boolean(process.env.NETLIFY_BLOBS_CONTEXT) ||
-    Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME)
-  );
-}
 
 async function readLocalBlocks(): Promise<ScheduleBlock[]> {
   const fs = await import("fs/promises");
@@ -50,7 +43,7 @@ async function writeBlobBlocks(blocks: ScheduleBlock[]): Promise<void> {
 }
 
 export async function getAllScheduleBlocks(): Promise<ScheduleBlock[]> {
-  if (isNetlifyProduction()) {
+  if (shouldUseNetlifyBlobs()) {
     return readBlobBlocks();
   }
   return readLocalBlocks();
@@ -59,7 +52,7 @@ export async function getAllScheduleBlocks(): Promise<ScheduleBlock[]> {
 export async function saveScheduleBlock(block: ScheduleBlock): Promise<void> {
   const blocks = await getAllScheduleBlocks();
   blocks.push(block);
-  if (isNetlifyProduction()) {
+  if (shouldUseNetlifyBlobs()) {
     await writeBlobBlocks(blocks);
   } else {
     await writeLocalBlocks(blocks);
@@ -71,7 +64,7 @@ export async function deleteScheduleBlock(id: string): Promise<boolean> {
   const next = blocks.filter((block) => block.id !== id);
   if (next.length === blocks.length) return false;
 
-  if (isNetlifyProduction()) {
+  if (shouldUseNetlifyBlobs()) {
     await writeBlobBlocks(next);
   } else {
     await writeLocalBlocks(next);

@@ -5,17 +5,10 @@ import {
   buildHoursDisplay,
   mergeClinicSettings,
 } from "./clinic-settings";
+import { shouldUseNetlifyBlobs } from "./storage-env";
 
 const BLOB_STORE = "bookings";
 const BLOB_KEY = "clinic-settings";
-
-function isNetlifyProduction(): boolean {
-  return (
-    process.env.NETLIFY === "true" ||
-    Boolean(process.env.NETLIFY_BLOBS_CONTEXT) ||
-    Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME)
-  );
-}
 
 async function readLocalSettings(): Promise<ClinicOperatingSettings | null> {
   const fs = await import("fs/promises");
@@ -52,7 +45,7 @@ async function writeBlobSettings(settings: ClinicOperatingSettings): Promise<voi
 }
 
 export async function getStoredClinicSettings(): Promise<ClinicOperatingSettings | null> {
-  if (isNetlifyProduction()) {
+  if (shouldUseNetlifyBlobs()) {
     return readBlobSettings();
   }
   return readLocalSettings();
@@ -61,7 +54,7 @@ export async function getStoredClinicSettings(): Promise<ClinicOperatingSettings
 export async function saveClinicSettings(
   settings: ClinicOperatingSettings
 ): Promise<ClinicOperatingSettings> {
-  if (isNetlifyProduction()) {
+  if (shouldUseNetlifyBlobs()) {
     await writeBlobSettings(settings);
   } else {
     await writeLocalSettings(settings);

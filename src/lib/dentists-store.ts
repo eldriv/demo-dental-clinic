@@ -6,17 +6,10 @@ import {
   isDentistIdValid,
   slugifyDentistName,
 } from "./dentists";
+import { shouldUseNetlifyBlobs } from "./storage-env";
 
 const BLOB_STORE = "bookings";
 const BLOB_KEY = "dentists";
-
-function isNetlifyProduction(): boolean {
-  return (
-    process.env.NETLIFY === "true" ||
-    Boolean(process.env.NETLIFY_BLOBS_CONTEXT) ||
-    Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME)
-  );
-}
 
 async function readLocalDentists(): Promise<ClinicDentist[]> {
   const fs = await import("fs/promises");
@@ -53,14 +46,14 @@ async function writeBlobDentists(dentists: ClinicDentist[]): Promise<void> {
 }
 
 async function readStoredDentists(): Promise<ClinicDentist[]> {
-  if (isNetlifyProduction()) {
+  if (shouldUseNetlifyBlobs()) {
     return readBlobDentists();
   }
   return readLocalDentists();
 }
 
 async function writeStoredDentists(dentists: ClinicDentist[]): Promise<void> {
-  if (isNetlifyProduction()) {
+  if (shouldUseNetlifyBlobs()) {
     await writeBlobDentists(dentists);
   } else {
     await writeLocalDentists(dentists);
