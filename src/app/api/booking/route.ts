@@ -3,8 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import type { Booking, CreateBookingInput } from "@/lib/bookings";
 import { BOOKING_VALIDATION } from "@/lib/bookings";
 import { saveBooking } from "@/lib/bookings-store";
-import { sendBookingConfirmationEmails } from "@/lib/email";
-import { createCalendarEvent } from "@/lib/calendar";
+import { sendBookingRequestEmails } from "@/lib/email";
 import { getSiteUrl } from "@/lib/site-url";
 import { site } from "@/content";
 
@@ -61,26 +60,21 @@ export async function POST(request: Request) {
       service: body.service.trim(),
       date: body.date,
       time: body.time,
-      status: "confirmed",
+      status: "pending",
       createdAt: now,
       updatedAt: now,
     };
 
-    const calendarResult = await createCalendarEvent(booking);
-    if (calendarResult.eventId) {
-      booking.calendarEventId = calendarResult.eventId;
-    }
-
     await saveBooking(booking);
 
-    const emailResult = await sendBookingConfirmationEmails(booking);
+    const emailResult = await sendBookingRequestEmails(booking);
     const manageUrl = `${getSiteUrl()}/manage/${token}`;
 
-    let message = "Your appointment has been booked successfully!";
+    let message = "Your appointment request has been submitted!";
     if (!emailResult.sent) {
-      message += ` A confirmation email could not be sent. Please save your manage link or call us at ${site.contact.phones[0]}.`;
+      message += ` We could not send a confirmation email. Please save your manage link or call us at ${site.contact.phones[0]}.`;
     } else {
-      message += " A confirmation email has been sent to your inbox.";
+      message += " Check your inbox — we'll email you once your visit is approved.";
     }
 
     return NextResponse.json({

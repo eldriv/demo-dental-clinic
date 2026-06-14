@@ -85,7 +85,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       const updated = await updateBooking(token, {
         date,
         time,
-        status: "rescheduled",
+        status: booking.status === "pending" ? "pending" : "rescheduled",
       });
 
       if (!updated) {

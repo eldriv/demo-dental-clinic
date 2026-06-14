@@ -7,7 +7,7 @@ export interface Booking {
   service: string;
   date: string;
   time: string;
-  status: "confirmed" | "cancelled" | "rescheduled";
+  status: "pending" | "confirmed" | "cancelled" | "rescheduled";
   createdAt: string;
   updatedAt: string;
   calendarEventId?: string;

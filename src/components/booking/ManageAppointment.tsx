@@ -107,14 +107,22 @@ export function ManageAppointment({ initialBooking }: ManageAppointmentProps) {
           className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wider ${
             isCancelled
               ? "bg-red-100 text-red-700"
-              : bookingData.status === "rescheduled"
-                ? "bg-amber-100 text-amber-700"
-                : "bg-primary/10 text-primary"
+              : bookingData.status === "pending"
+                ? "bg-amber-100 text-amber-800"
+                : bookingData.status === "rescheduled"
+                  ? "bg-blue-100 text-blue-700"
+                  : "bg-primary/10 text-primary"
           }`}
         >
-          {bookingData.status}
+          {bookingData.status === "pending" ? "Pending approval" : bookingData.status}
         </span>
       </div>
+
+      {bookingData.status === "pending" && (
+        <p className="mb-6 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Your request is awaiting clinic approval. You&apos;ll receive a confirmation email once approved.
+        </p>
+      )}
 
       <dl className="space-y-4">
         {[

@@ -2,6 +2,14 @@ import nodemailer from "nodemailer";
 import { site } from "@/content";
 import type { Booking } from "./bookings";
 import { getSiteUrl } from "./site-url";
+import {
+  bookingDetailRows,
+  buildBrandedEmail,
+  buildClinicNewBookingEmail,
+  buildPatientApprovedEmail,
+  buildPatientRequestEmail,
+  formatDisplayDate,
+} from "./email-templates";
 
 function isSmtpConfigured(): boolean {
   return Boolean(
@@ -25,18 +33,13 @@ function createTransporter() {
 }
 
 function formatBookingDetails(booking: Booking): string {
-  return `
-Name: ${booking.name}
-Email: ${booking.email}
-Phone: ${booking.phone}
-Service: ${booking.service}
-Date: ${booking.date}
-Time: ${booking.time}
-Status: ${booking.status}
-  `.trim();
+  return bookingDetailRows(booking)
+    .map((row) => `${row.label}: ${row.value}`)
+    .concat(`Status: ${booking.status}`)
+    .join("\n");
 }
 
-export async function sendBookingConfirmationEmails(
+export async function sendBookingRequestEmails(
   booking: Booking
 ): Promise<{ sent: boolean; error?: string }> {
   if (!isSmtpConfigured()) {
@@ -51,32 +54,43 @@ export async function sendBookingConfirmationEmails(
     await transporter.sendMail({
       from: `"${site.name}" <${process.env.SMTP_USER}>`,
       to: booking.email,
-      subject: `Appointment Confirmed — ${site.name}`,
-      text: `Dear ${booking.name},\n\nYour appointment has been confirmed.\n\n${formatBookingDetails(booking)}\n\nManage your appointment: ${manageUrl}\n\nThank you,\n${site.name}`,
-      html: `
-        <h2>Appointment Confirmed</h2>
-        <p>Dear ${booking.name},</p>
-        <p>Your appointment at ${site.name} has been confirmed.</p>
-        <ul>
-          <li><strong>Service:</strong> ${booking.service}</li>
-          <li><strong>Date:</strong> ${booking.date}</li>
-          <li><strong>Time:</strong> ${booking.time}</li>
-        </ul>
-        <p><a href="${manageUrl}">Manage your appointment</a></p>
-        <p>Thank you,<br/>${site.name}</p>
-      `,
+      subject: `Appointment request received — ${booking.service}`,
+      text: `Dear ${booking.name},\n\nWe received your appointment request and will confirm it shortly.\n\n${formatBookingDetails(booking)}\n\nManage your appointment: ${manageUrl}\n\nThank you,\n${site.name}`,
+      html: buildPatientRequestEmail(booking),
     });
 
     await transporter.sendMail({
       from: `"${site.name}" <${process.env.SMTP_USER}>`,
       to: clinicEmail,
-      subject: `New Booking — ${booking.name}`,
-      text: `New appointment booked:\n\n${formatBookingDetails(booking)}\n\nManage: ${manageUrl}`,
-      html: `
-        <h2>New Appointment Booking</h2>
-        <pre>${formatBookingDetails(booking)}</pre>
-        <p><a href="${manageUrl}">View booking</a></p>
-      `,
+      subject: `New Booking Request — ${booking.name}`,
+      text: `New appointment request:\n\n${formatBookingDetails(booking)}\n\nConfirm: ${getSiteUrl()}/api/bookings/${booking.token}/confirm`,
+      html: buildClinicNewBookingEmail(booking),
+    });
+
+    return { sent: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Email send failed";
+    return { sent: false, error: message };
+  }
+}
+
+export async function sendBookingApprovedEmail(
+  booking: Booking
+): Promise<{ sent: boolean; error?: string }> {
+  if (!isSmtpConfigured()) {
+    return { sent: false, error: "SMTP not configured" };
+  }
+
+  const transporter = createTransporter();
+  const manageUrl = `${getSiteUrl()}/manage/${booking.token}`;
+
+  try {
+    await transporter.sendMail({
+      from: `"${site.name}" <${process.env.SMTP_USER}>`,
+      to: booking.email,
+      subject: `Appointment Confirmed — ${site.name}`,
+      text: `Dear ${booking.name},\n\nYour appointment has been confirmed.\n\n${formatBookingDetails(booking)}\n\nManage your appointment: ${manageUrl}\n\nThank you,\n${site.name}`,
+      html: buildPatientApprovedEmail(booking),
     });
 
     return { sent: true };
@@ -101,7 +115,13 @@ export async function sendCancellationEmails(
       from: `"${site.name}" <${process.env.SMTP_USER}>`,
       to: booking.email,
       subject: `Appointment Cancelled — ${site.name}`,
-      text: `Dear ${booking.name},\n\nYour appointment on ${booking.date} at ${booking.time} has been cancelled.\n\nTo rebook, call us at ${site.contact.phones[0]}.\n\n${site.name}`,
+      text: `Dear ${booking.name},\n\nYour appointment on ${formatDisplayDate(booking.date)} at ${booking.time} has been cancelled.\n\nTo rebook, contact us at ${site.contact.phones[0]}.\n\n${site.name}`,
+      html: buildBrandedEmail({
+        heading: "Appointment Cancelled",
+        intro: `Dear ${booking.name}, your appointment on ${formatDisplayDate(booking.date)} at ${booking.time} has been cancelled.`,
+        rows: bookingDetailRows(booking),
+        footerNote: `To rebook, contact us at ${site.contact.phones[0]}.`,
+      }),
     });
 
     await transporter.sendMail({
@@ -109,6 +129,11 @@ export async function sendCancellationEmails(
       to: clinicEmail,
       subject: `Booking Cancelled — ${booking.name}`,
       text: `Appointment cancelled:\n\n${formatBookingDetails(booking)}`,
+      html: buildBrandedEmail({
+        heading: "Booking Cancelled",
+        intro: `The appointment for ${booking.name} has been cancelled.`,
+        rows: bookingDetailRows(booking),
+      }),
     });
 
     return { sent: true };
@@ -134,7 +159,13 @@ export async function sendRescheduleEmails(
       from: `"${site.name}" <${process.env.SMTP_USER}>`,
       to: booking.email,
       subject: `Appointment Rescheduled — ${site.name}`,
-      text: `Dear ${booking.name},\n\nYour appointment has been rescheduled to ${booking.date} at ${booking.time}.\n\nManage: ${manageUrl}`,
+      text: `Dear ${booking.name},\n\nYour appointment has been rescheduled to ${formatDisplayDate(booking.date)} at ${booking.time}.\n\nManage: ${manageUrl}`,
+      html: buildBrandedEmail({
+        heading: "Appointment Rescheduled",
+        intro: `Dear ${booking.name}, your appointment has been updated to the new date and time below.`,
+        rows: bookingDetailRows(booking),
+        cta: { label: "Manage Appointment", href: manageUrl, color: "primary" },
+      }),
     });
 
     await transporter.sendMail({
@@ -142,6 +173,12 @@ export async function sendRescheduleEmails(
       to: clinicEmail,
       subject: `Booking Rescheduled — ${booking.name}`,
       text: `Appointment rescheduled:\n\n${formatBookingDetails(booking)}`,
+      html: buildBrandedEmail({
+        heading: "Booking Rescheduled",
+        intro: `${booking.name} rescheduled their appointment.`,
+        rows: bookingDetailRows(booking),
+        cta: { label: "View Booking", href: manageUrl, color: "primary" },
+      }),
     });
 
     return { sent: true };
@@ -153,4 +190,9 @@ export async function sendRescheduleEmails(
 
 export function isEmailConfigured(): boolean {
   return isSmtpConfigured();
+}
+
+/** @deprecated Use sendBookingRequestEmails or sendBookingApprovedEmail */
+export async function sendBookingConfirmationEmails(booking: Booking) {
+  return sendBookingRequestEmails(booking);
 }
