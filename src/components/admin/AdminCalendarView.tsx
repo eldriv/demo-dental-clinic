@@ -103,21 +103,22 @@ export function AdminCalendarView({
             </button>
           </div>
 
-          <div className="mb-2 grid grid-cols-7 gap-1">
+          <div className="mb-2 grid grid-cols-7 gap-0.5 sm:gap-1">
             {weekdayLabels.map((label) => (
               <div
                 key={label}
-                className="py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted"
+                className="py-1.5 text-center text-[10px] font-semibold uppercase tracking-wide text-muted sm:py-2 sm:text-xs"
               >
-                {label}
+                <span className="sm:hidden">{label.slice(0, 1)}</span>
+                <span className="hidden sm:inline">{label}</span>
               </div>
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-1">
+          <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
             {monthGrid.map((date, index) => {
               if (!date) {
-                return <div key={`empty-${index}`} className="min-h-20 rounded-xl" />;
+                return <div key={`empty-${index}`} className="min-h-12 rounded-lg sm:min-h-20 sm:rounded-xl" />;
               }
 
               const dateString = toDateString(date);
@@ -133,7 +134,7 @@ export function AdminCalendarView({
                   disabled={isPast}
                   onClick={() => setSelectedDate(dateString)}
                   aria-disabled={isPast}
-                  className={`min-h-20 rounded-xl border p-2 text-left transition-colors ${
+                  className={`min-h-12 rounded-lg border p-1 text-left transition-colors sm:min-h-20 sm:rounded-xl sm:p-2 ${
                     isPast
                       ? "cursor-not-allowed border-gray-100 bg-gray-50 opacity-50"
                       : isSelected
@@ -143,7 +144,7 @@ export function AdminCalendarView({
                 >
                   <div className="flex items-start justify-between gap-1">
                     <span
-                      className={`inline-flex size-7 items-center justify-center rounded-full text-sm font-semibold ${
+                      className={`inline-flex size-6 items-center justify-center rounded-full text-xs font-semibold sm:size-7 sm:text-sm ${
                         isToday
                           ? "bg-primary text-white"
                           : isPast
@@ -154,13 +155,17 @@ export function AdminCalendarView({
                       {date.getDate()}
                     </span>
                     {summary.blocked && !isPast && (
-                      <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
+                      <span className="rounded-full bg-red-100 px-1 py-0.5 text-[8px] font-semibold text-red-700 sm:px-1.5 sm:text-[10px]">
                         Blocked
                       </span>
                     )}
                   </div>
 
-                  <div className="mt-2 space-y-1">
+                  {!isPast && summary.total > 0 && (
+                    <span className="mt-1 block size-1.5 rounded-full bg-primary sm:hidden" aria-hidden />
+                  )}
+
+                  <div className="mt-1 hidden space-y-1 sm:mt-2 sm:block">
                     {isPast ? (
                       <span className="block text-[11px] text-muted">Past</span>
                     ) : (
@@ -221,7 +226,7 @@ export function AdminCalendarView({
               {availability.map((slot) => (
                 <div
                   key={slot.time}
-                  className={`flex items-center justify-between rounded-xl px-3 py-2 text-sm ${
+                  className={`flex flex-col gap-1 rounded-xl px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between ${
                     slot.state === "open"
                       ? "bg-green-50 text-green-800"
                       : slot.state === "booked"
@@ -230,11 +235,11 @@ export function AdminCalendarView({
                   }`}
                 >
                   <span className="font-medium">{slot.time}</span>
-                  <span className="text-xs">
+                  <span className="text-xs sm:text-left sm:text-inherit">
                     {slot.state === "open" && "Available"}
                     {slot.state === "blocked" && "Blocked"}
                     {slot.state === "booked" && slot.booking && (
-                      <span>
+                      <span className="break-words">
                         {slot.booking.name} · {slot.booking.service}
                       </span>
                     )}

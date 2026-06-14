@@ -25,7 +25,7 @@ export function DentistLeaveOverview({
         </div>
         <Link
           href="/admin/schedule"
-          className="rounded-full bg-white px-4 py-2 text-sm font-medium text-primary ring-1 ring-gray-200 transition-colors hover:bg-surface"
+          className="inline-flex w-full items-center justify-center rounded-full bg-white px-4 py-2.5 text-sm font-medium text-primary ring-1 ring-gray-200 transition-colors hover:bg-surface sm:w-auto"
         >
           Manage blocks
         </Link>

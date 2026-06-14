@@ -93,7 +93,7 @@ export function AdminAppointmentsPageClient({
         description="Review requests, assign dentists, and manage patient visits."
       />
 
-      <div className="admin-segment inline-flex">
+      <div className="admin-segment">
         {tabs.map((tab) => (
           <button
             key={tab.id}

@@ -78,8 +78,46 @@ body {
   @apply min-h-dvh bg-[#eef3f0];
 }
 
-.admin-sidebar {
-  @apply flex w-full shrink-0 flex-col border-b border-dark/10 bg-linear-to-br from-dark via-dark to-dark-light text-white lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 lg:w-64 lg:border-b-0 lg:border-r lg:border-white/10 lg:shadow-xl;
+.admin-mobile-header {
+  @apply sticky top-0 z-20 flex items-center gap-2 border-b border-gray-200/80 bg-white/95 px-3 py-3 shadow-sm backdrop-blur-sm;
+}
+
+.admin-icon-btn {
+  @apply flex size-10 shrink-0 items-center justify-center rounded-xl text-dark transition-colors hover:bg-surface;
+}
+
+.admin-icon-btn-dark {
+  @apply text-white/80 hover:bg-white/10 hover:text-white;
+}
+
+.admin-sidebar-backdrop {
+  @apply fixed inset-0 z-40 bg-dark/50 backdrop-blur-sm;
+}
+
+.admin-sidebar-drawer {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 50;
+  display: flex;
+  width: min(100vw - 3rem, 18rem);
+  max-width: 100%;
+  flex-direction: column;
+  border-right: 1px solid rgb(255 255 255 / 0.1);
+  background: linear-gradient(to bottom right, var(--color-dark), var(--color-dark), var(--color-dark-light));
+  color: white;
+  box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+}
+
+.admin-sidebar-desktop {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 30;
+  width: 16rem;
+  flex-direction: column;
+  border-right: 1px solid rgb(255 255 255 / 0.1);
+  background: linear-gradient(to bottom right, var(--color-dark), var(--color-dark), var(--color-dark-light));
+  color: white;
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1);
 }
 
 .admin-main {
@@ -87,7 +125,19 @@ body {
 }
 
 .admin-content {
-  @apply mx-auto w-full max-w-6xl flex-1 px-4 py-5 sm:px-6 sm:py-8;
+  @apply mx-auto w-full max-w-6xl flex-1 px-3 py-4 pb-24 sm:px-6 sm:py-8 lg:pb-8;
+}
+
+.admin-bottom-nav {
+  @apply fixed inset-x-0 bottom-0 z-30 flex items-stretch justify-around border-t border-gray-200/80 bg-white/95 px-1 py-1.5 shadow-[0_-4px_24px_rgba(26,60,52,0.08)] backdrop-blur-sm;
+}
+
+.admin-bottom-nav-link {
+  @apply flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-2 text-[10px] font-semibold text-muted transition-colors;
+}
+
+.admin-bottom-nav-link-active {
+  @apply bg-primary/10 text-primary;
 }
 
 .admin-card {
@@ -115,15 +165,15 @@ body {
 }
 
 .admin-page-title {
-  @apply text-2xl font-bold tracking-tight text-dark sm:text-3xl;
+  @apply text-xl font-bold tracking-tight text-dark sm:text-2xl lg:text-3xl;
 }
 
 .admin-segment {
-  @apply inline-flex rounded-xl bg-white p-1 shadow-sm ring-1 ring-gray-200/80;
+  @apply flex max-w-full gap-1 overflow-x-auto rounded-xl bg-white p-1 shadow-sm ring-1 ring-gray-200/80 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden;
 }
 
 .admin-segment-btn {
-  @apply rounded-lg px-4 py-2 text-sm font-medium text-muted transition-all duration-200;
+  @apply shrink-0 rounded-lg px-3 py-2 text-sm font-medium text-muted transition-all duration-200 sm:px-4;
 }
 
 .admin-segment-btn-active {
@@ -163,7 +213,12 @@ body {
 }
 
 .admin-actions-bar {
-  @apply flex flex-wrap gap-2 border-t border-gray-100 pt-4;
+  @apply flex flex-col gap-2 border-t border-gray-100 pt-4 sm:flex-row sm:flex-wrap;
+}
+
+.admin-actions-bar .btn-cta-sm,
+.admin-actions-bar .btn-outline {
+  @apply w-full justify-center sm:w-auto;
 }
 
 .placeholder-cover {

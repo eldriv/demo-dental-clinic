@@ -10,7 +10,8 @@
     "generate": "node scripts/generate-from-config.mjs",
     "scaffold": "node scripts/scaffold-clinic.mjs",
     "clinic": "node scripts/make-clinic.mjs",
-    "generate:assets": "python3 scripts/generate-assets.py"
+    "generate:assets": "python3 scripts/generate-assets.py",
+    "blobs:clear": "bash scripts/clear-netlify-blobs.sh"
   },
   "dependencies": {
     "@netlify/blobs": "^10.7.9",
