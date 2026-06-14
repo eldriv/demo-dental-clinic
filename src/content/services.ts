@@ -1,0 +1,131 @@
+import { lorem } from "./lorem";
+
+export interface Service {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+}
+
+export const services: Service[] = [
+  {
+    id: "general-dentistry",
+    name: "General Dentistry",
+    description: lorem.short,
+    icon: "stethoscope",
+  },
+  {
+    id: "teeth-cleaning",
+    name: "Teeth Cleaning",
+    description: lorem.short,
+    icon: "sparkles",
+  },
+  {
+    id: "dental-fillings",
+    name: "Dental Fillings",
+    description: lorem.short,
+    icon: "shield",
+  },
+  {
+    id: "root-canal",
+    name: "Root Canal Therapy",
+    description: lorem.short,
+    icon: "heart-pulse",
+  },
+  {
+    id: "tooth-extractions",
+    name: "Tooth Extractions",
+    description: lorem.short,
+    icon: "scissors",
+  },
+  {
+    id: "dental-crowns",
+    name: "Dental Crowns",
+    description: lorem.short,
+    icon: "crown",
+  },
+  {
+    id: "dental-bridges",
+    name: "Dental Bridges",
+    description: lorem.short,
+    icon: "link",
+  },
+  {
+    id: "dental-implants",
+    name: "Dental Implants",
+    description: lorem.short,
+    icon: "anchor",
+  },
+  {
+    id: "teeth-whitening",
+    name: "Teeth Whitening",
+    description: lorem.short,
+    icon: "sun",
+  },
+  {
+    id: "invisalign",
+    name: "Invisalign / Clear Aligners",
+    description: lorem.short,
+    icon: "align-center",
+  },
+  {
+    id: "braces",
+    name: "Braces / Orthodontics",
+    description: lorem.short,
+    icon: "grid-3x3",
+  },
+  {
+    id: "pediatric",
+    name: "Pediatric Dentistry",
+    description: lorem.short,
+    icon: "baby",
+  },
+  {
+    id: "gum-disease",
+    name: "Gum Disease Treatment",
+    description: lorem.short,
+    icon: "activity",
+  },
+  {
+    id: "emergency",
+    name: "Emergency Dental Care",
+    description: lorem.short,
+    icon: "siren",
+  },
+  {
+    id: "x-rays",
+    name: "Dental X-Rays & Imaging",
+    description: lorem.short,
+    icon: "scan",
+  },
+  {
+    id: "oral-cancer",
+    name: "Oral Cancer Screening",
+    description: lorem.short,
+    icon: "search",
+  },
+  {
+    id: "sedation",
+    name: "Sedation Dentistry",
+    description: lorem.short,
+    icon: "moon",
+  },
+  {
+    id: "veneers",
+    name: "Veneers",
+    description: lorem.short,
+    icon: "gem",
+  },
+  {
+    id: "dentures",
+    name: "Dentures",
+    description: lorem.short,
+    icon: "smile",
+  },
+  {
+    id: "tmj",
+    name: "TMJ Treatment",
+    description: lorem.short,
+    icon: "bone",
+  },
+];
