@@ -127,10 +127,12 @@ function LoginForm() {
             </button>
           </form>
 
-          <p className="mt-6 text-xs leading-relaxed text-muted">
-            Local dev password:{" "}
-            <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-[11px]">smilecare2026</code>
-          </p>
+          {process.env.NODE_ENV === "development" && (
+            <p className="mt-6 text-xs leading-relaxed text-muted">
+              Local dev password:{" "}
+              <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-[11px]">smilecare2026</code>
+            </p>
+          )}
         </div>
       </div>
     </div>
