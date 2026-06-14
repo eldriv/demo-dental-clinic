@@ -1,6 +1,12 @@
-import type { Booking } from "@/lib/bookings";
-import type { ScheduleBlock } from "@/lib/schedule-block-utils";
-import { isClinicWideDateBlocked } from "@/lib/schedule-block-utils";
+import type { Booking } from "./bookings";
+import type { ScheduleBlock } from "./schedule-block-utils";
+import { isClinicWideDateBlocked, isDateBlocked } from "./schedule-block-utils";
+import {
+  countDentistOpenSlots,
+  getDentistDayAvailability,
+  isAnyDentist,
+  type DentistSlotAvailability,
+} from "./dentist-availability";
 
 export const CALENDAR_ACTIVE_STATUSES: Booking["status"][] = [
   "pending",
@@ -76,59 +82,133 @@ export function getBookingsForDate(bookings: Booking[], date: string): Booking[]
     .sort((a, b) => a.time.localeCompare(b.time));
 }
 
+export function filterBookingsForDentist(
+  bookings: Booking[],
+  dentistId: string
+): Booking[] {
+  return bookings.filter((booking) => {
+    if (booking.assignedDentistId === dentistId) return true;
+    if (booking.preferredDentistId === dentistId) return true;
+    if (
+      isAnyDentist(booking.preferredDentistId) &&
+      isAnyDentist(booking.assignedDentistId)
+    ) {
+      return true;
+    }
+    return false;
+  });
+}
+
 export function getDaySummary(
   bookings: Booking[],
   blocks: ScheduleBlock[],
-  date: string
+  date: string,
+  dentistId?: string
 ): {
   total: number;
   confirmed: number;
   pending: number;
   blocked: boolean;
+  clinicBlocked: boolean;
+  onLeave: boolean;
 } {
-  const dayBookings = getBookingsForDate(bookings, date);
+  let dayBookings = getBookingsForDate(bookings, date);
+  if (dentistId) {
+    dayBookings = filterBookingsForDentist(dayBookings, dentistId);
+  }
+
+  const clinicBlocked = isClinicWideDateBlocked(date, blocks);
+  const onLeave = dentistId ? isDateBlocked(date, blocks, dentistId) : false;
+
   return {
     total: dayBookings.length,
     confirmed: dayBookings.filter(
       (b) => b.status === "confirmed" || b.status === "rescheduled" || b.status === "completed"
     ).length,
     pending: dayBookings.filter((b) => b.status === "pending").length,
-    blocked: isClinicWideDateBlocked(date, blocks),
+    blocked: clinicBlocked || onLeave,
+    clinicBlocked,
+    onLeave,
   };
 }
 
-export interface SlotAvailability {
-  time: string;
-  state: "open" | "booked" | "blocked";
-  booking?: Booking;
+export type DayCellTone = "past" | "leave" | "blocked" | "pending" | "confirmed" | "open";
+
+export function getDayCellLabel(
+  summary: ReturnType<typeof getDaySummary>,
+  isPast: boolean
+): { label: string; tone: DayCellTone } {
+  if (isPast) return { label: "Past", tone: "past" };
+  if (summary.onLeave && !summary.clinicBlocked) return { label: "On leave", tone: "leave" };
+  if (summary.clinicBlocked) return { label: "Blocked", tone: "blocked" };
+  if (summary.pending > 0) {
+    return { label: `${summary.pending} pending`, tone: "pending" };
+  }
+  if (summary.confirmed > 0) {
+    return { label: `${summary.confirmed} confirmed`, tone: "confirmed" };
+  }
+  return { label: "Open", tone: "open" };
 }
+
+const dayCellToneClasses: Record<DayCellTone, string> = {
+  past: "text-muted",
+  leave: "text-red-700",
+  blocked: "text-red-700",
+  pending: "text-amber-700",
+  confirmed: "text-primary",
+  open: "text-muted",
+};
+
+export function getDayCellToneClass(tone: DayCellTone): string {
+  return dayCellToneClasses[tone];
+}
+
+export function getDayCellSurfaceClass(
+  summary: ReturnType<typeof getDaySummary>,
+  isPast: boolean,
+  isSelected: boolean
+): string {
+  if (isPast) {
+    return "cursor-not-allowed border-gray-100 bg-gray-50 opacity-50";
+  }
+
+  if (summary.onLeave && !summary.clinicBlocked) {
+    return isSelected
+      ? "border-red-300 bg-red-50 ring-1 ring-primary/30"
+      : "border-red-100 bg-red-50/70 hover:border-red-200";
+  }
+
+  if (summary.clinicBlocked) {
+    return isSelected
+      ? "border-red-300 bg-red-50 ring-1 ring-primary/30"
+      : "border-red-100 bg-red-50/70 hover:border-red-200";
+  }
+
+  return isSelected
+    ? "border-primary bg-primary/10"
+    : "border-gray-100 bg-white hover:border-primary/30 hover:bg-surface";
+}
+
+export type SlotAvailability = DentistSlotAvailability;
 
 export function getDayAvailability(
   bookings: Booking[],
   blocks: ScheduleBlock[],
   date: string,
-  timeSlots: string[]
+  timeSlots: string[],
+  dentistId: string
 ): SlotAvailability[] {
-  const blocked = isClinicWideDateBlocked(date, blocks);
-  const dayBookings = bookings.filter(
-    (booking) =>
-      booking.date === date && CALENDAR_BOOKED_STATUSES.includes(booking.status)
-  );
-
-  return timeSlots.map((time) => {
-    if (blocked) {
-      return { time, state: "blocked" as const };
-    }
-
-    const booking = dayBookings.find((entry) => entry.time === time);
-    if (booking) {
-      return { time, state: "booked" as const, booking };
-    }
-
-    return { time, state: "open" as const };
-  });
+  return getDentistDayAvailability(bookings, blocks, date, timeSlots, dentistId);
 }
 
 export function countOpenSlots(availability: SlotAvailability[]): number {
-  return availability.filter((slot) => slot.state === "open").length;
+  return countDentistOpenSlots(availability);
+}
+
+export function countBookedSlots(availability: SlotAvailability[]): number {
+  return availability.filter((slot) => slot.state === "booked").length;
+}
+
+export function countPendingSlots(availability: SlotAvailability[]): number {
+  return availability.filter((slot) => slot.state === "pending").length;
 }

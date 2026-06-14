@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, CalendarRange } from "lucide-react";
 import type { Booking } from "@/lib/bookings";
+import { isTodayVisit } from "@/lib/admin-booking-filters";
 import {
   CALENDAR_ACTIVE_STATUSES,
   formatMonthLabel,
@@ -37,7 +38,7 @@ export function AdminCalendarOverview({ bookings }: AdminCalendarOverviewProps) 
   const bookedDates = new Set(activeBookings.map((b) => b.date));
   const weekDates = datesInRange(today, 7);
   const thisWeekCount = activeBookings.filter((b) => weekDates.includes(b.date)).length;
-  const todayCount = activeBookings.filter((b) => b.date === todayString).length;
+  const todayCount = bookings.filter((booking) => isTodayVisit(booking, todayString)).length;
   const monthCount = activeBookings.filter((b) => {
     const d = new Date(`${b.date}T12:00:00`);
     return d.getFullYear() === year && d.getMonth() === month;

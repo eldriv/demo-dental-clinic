@@ -22,6 +22,7 @@ import {
 } from "@/components/admin/AdminPageHeader";
 import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { AdminCalendarOverview } from "@/components/admin/AdminCalendarOverview";
+import { AdminAttendanceAlerts } from "@/components/admin/AdminAttendanceAlerts";
 import { needsStaffApproval } from "@/lib/booking-status";
 
 export const dynamic = "force-dynamic";
@@ -71,6 +72,8 @@ export default async function AdminOverviewPage() {
           accent="blue"
         />
       </div>
+
+      <AdminAttendanceAlerts />
 
       <AdminCalendarOverview bookings={bookings} />
 

@@ -1,31 +1,39 @@
 import type { Booking } from "./bookings";
 import type { ClinicOperatingSettings } from "./clinic-settings";
-import { generateTimeSlots, isOperatingDay, isValidTimeSlot } from "./clinic-settings";
+import { isOperatingDay } from "./clinic-settings";
+import type { ClinicDentist } from "./dentists";
 import type { ScheduleBlock } from "./schedule-block-utils";
 import { isClinicWideDateBlocked } from "./schedule-block-utils";
+import {
+  ANY_DENTIST_ID,
+  getAvailableTimeSlotsForDentist,
+  getTimeSlotOptionsForDentist,
+  holdsDentistSlotForBooking,
+  validateDentistBooking,
+  type TimeSlotOption,
+} from "./dentist-availability";
 
-export const SLOT_HOLDING_STATUSES: Booking["status"][] = [
-  "pending",
-  "confirmed",
-  "rescheduled",
-];
+export type { TimeSlotOption } from "./dentist-availability";
 
-export function holdsSlot(booking: Booking): boolean {
-  return SLOT_HOLDING_STATUSES.includes(booking.status);
-}
+export { ANY_DENTIST_ID, holdsDentistSlotForBooking as holdsSlot } from "./dentist-availability";
 
-export function isSlotTaken(
-  bookings: Booking[],
+export function getTimeSlotOptions(
   date: string,
-  time: string,
+  settings: ClinicOperatingSettings,
+  bookings: Booking[],
+  blocks: ScheduleBlock[],
+  dentists: ClinicDentist[],
+  dentistId?: string,
   excludeToken?: string
-): boolean {
-  return bookings.some(
-    (booking) =>
-      booking.date === date &&
-      booking.time === time &&
-      holdsSlot(booking) &&
-      booking.token !== excludeToken
+): TimeSlotOption[] {
+  return getTimeSlotOptionsForDentist(
+    date,
+    settings,
+    bookings,
+    blocks,
+    dentists,
+    dentistId,
+    excludeToken
   );
 }
 
@@ -34,13 +42,18 @@ export function getAvailableTimeSlots(
   settings: ClinicOperatingSettings,
   bookings: Booking[],
   blocks: ScheduleBlock[],
+  dentists: ClinicDentist[],
+  dentistId?: string,
   excludeToken?: string
 ): string[] {
-  if (!isOperatingDay(date, settings)) return [];
-  if (isClinicWideDateBlocked(date, blocks)) return [];
-
-  return generateTimeSlots(settings).filter(
-    (time) => !isSlotTaken(bookings, date, time, excludeToken)
+  return getAvailableTimeSlotsForDentist(
+    date,
+    settings,
+    bookings,
+    blocks,
+    dentists,
+    dentistId,
+    excludeToken
   );
 }
 
@@ -50,32 +63,20 @@ export function validateSlotBooking(options: {
   settings: ClinicOperatingSettings;
   bookings: Booking[];
   blocks: ScheduleBlock[];
+  dentists: ClinicDentist[];
+  dentistId?: string;
   excludeToken?: string;
 }): string | null {
-  const { date, time, settings, bookings, blocks, excludeToken } = options;
+  return validateDentistBooking({
+    ...options,
+    dentistId: options.dentistId ?? ANY_DENTIST_ID,
+  });
+}
 
-  const bookingDate = new Date(`${date}T12:00:00`);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  if (bookingDate < today) {
-    return "Please select a future date.";
-  }
-
-  if (!isOperatingDay(date, settings)) {
-    return "The clinic is closed on the selected date. Please choose another day.";
-  }
-
-  if (isClinicWideDateBlocked(date, blocks)) {
-    return "The clinic is closed on the selected date. Please choose another day.";
-  }
-
-  if (!isValidTimeSlot(time, settings)) {
-    return "Please select a valid appointment time.";
-  }
-
-  if (isSlotTaken(bookings, date, time, excludeToken)) {
-    return "This time slot is no longer available. Please choose another time.";
-  }
-
-  return null;
+export function isOperatingDayClosed(
+  date: string,
+  settings: ClinicOperatingSettings,
+  blocks: ScheduleBlock[]
+): boolean {
+  return !isOperatingDay(date, settings) || isClinicWideDateBlocked(date, blocks);
 }

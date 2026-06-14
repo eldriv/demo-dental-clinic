@@ -56,6 +56,20 @@ function toMinutes(time: string): number {
   return hours * 60 + minutes;
 }
 
+/** True when the slot start time is already in the past on the same calendar day. */
+export function isAppointmentSlotInPast(
+  date: string,
+  time: string,
+  now = new Date()
+): boolean {
+  const todayString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  if (date !== todayString) return false;
+
+  const slotMinutes = toMinutes(time);
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  return slotMinutes <= nowMinutes;
+}
+
 export function generateTimeSlots(settings: ClinicOperatingSettings): string[] {
   const open = toMinutes(settings.openTime);
   const close = toMinutes(settings.closeTime);

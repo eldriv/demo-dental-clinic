@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { Booking } from "@/lib/bookings";
 import { AppointmentCard } from "@/components/admin/AppointmentCard";
 import { needsStaffApproval } from "@/lib/booking-status";
+import { isTodayVisit } from "@/lib/admin-booking-filters";
 import {
   AdminEmptyState,
   AdminPageHeader,
@@ -64,12 +65,7 @@ export function AdminAppointmentsPageClient({
       return bookings.filter((booking) => needsStaffApproval(booking));
     }
     if (filter === "today") {
-      return bookings.filter(
-        (booking) =>
-          booking.date === today &&
-          booking.status !== "cancelled" &&
-          booking.status !== "declined"
-      );
+      return bookings.filter((booking) => isTodayVisit(booking, today));
     }
     return bookings;
   }, [bookings, filter, today]);

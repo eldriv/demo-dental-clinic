@@ -226,6 +226,71 @@ export async function sendRescheduleEmails(
   }
 }
 
+export async function sendLateNoticeEmails(
+  booking: Booking,
+  siteUrl?: string
+): Promise<{ sent: boolean; error?: string }> {
+  if (!isSmtpConfigured()) {
+    return { sent: false, error: "SMTP not configured" };
+  }
+
+  const baseUrl = siteUrl ?? getSiteUrl();
+  const transporter = createTransporter();
+  const manageUrl = buildManageUrl(booking.token, baseUrl);
+  const clinicEmail = process.env.CLINIC_EMAIL!;
+  const lateDetail =
+    typeof booking.lateNoticeMinutes === "number" && booking.lateNoticeMinutes > 0
+      ? `about ${booking.lateNoticeMinutes} minutes`
+      : "a bit";
+  const note = booking.lateNoticeNote?.trim();
+
+  try {
+    await transporter.sendMail({
+      from: `"${site.name}" <${process.env.SMTP_USER}>`,
+      to: booking.email,
+      subject: `Late arrival notice received — ${site.name}`,
+      text: `Dear ${booking.name},\n\nWe received your late arrival notice for ${formatDisplayDate(booking.date)} at ${booking.time}.\n\nManage: ${manageUrl}`,
+      html: buildBrandedEmail({
+        heading: "Late Arrival Notice Received",
+        intro: `Hi ${booking.name}, we've notified the front desk that you'll be ${lateDetail} late for your appointment today.`,
+        rows: [
+          ...bookingDetailRows(booking),
+          ...(note ? [{ label: "Your note", value: note }] : []),
+        ],
+        cta: { label: "Manage Appointment", href: manageUrl, color: "primary" },
+      }),
+    });
+
+    await transporter.sendMail({
+      from: `"${site.name}" <${process.env.SMTP_USER}>`,
+      to: clinicEmail,
+      subject: `Late arrival — ${booking.name} at ${booking.time}`,
+      text: `${booking.name} reported they will be late.\n\n${formatBookingDetails(booking)}${note ? `\nNote: ${note}` : ""}`,
+      html: buildBrandedEmail({
+        heading: "Patient Running Late",
+        intro: `${booking.name} submitted a late arrival notice for today's ${booking.time} appointment.`,
+        rows: [
+          ...bookingDetailRows(booking),
+          {
+            label: "Estimated delay",
+            value:
+              typeof booking.lateNoticeMinutes === "number" && booking.lateNoticeMinutes > 0
+                ? `${booking.lateNoticeMinutes} minutes`
+                : "Not specified",
+          },
+          ...(note ? [{ label: "Patient note", value: note }] : []),
+        ],
+        cta: { label: "Open Dashboard", href: `${baseUrl}/admin`, color: "accent" },
+      }),
+    });
+
+    return { sent: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Email send failed";
+    return { sent: false, error: message };
+  }
+}
+
 export function isEmailConfigured(): boolean {
   return isSmtpConfigured();
 }

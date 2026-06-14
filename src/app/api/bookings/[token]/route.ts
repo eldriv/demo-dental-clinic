@@ -13,7 +13,11 @@ import { site } from "@/content";
 import { getClinicSettings } from "@/lib/clinic-settings-store";
 import { getAllScheduleBlocks } from "@/lib/schedule-blocks";
 import { getAllBookings } from "@/lib/bookings-store";
-import { validateSlotBooking } from "@/lib/booking-availability";
+import { getAllDentists } from "@/lib/dentists-store";
+import { ANY_DENTIST_ID, validateSlotBooking } from "@/lib/booking-availability";
+import { isAnyDentist } from "@/lib/dentist-availability";
+import { canReportLateArrival, isActiveAppointment } from "@/lib/appointment-attendance";
+import { sendLateNoticeEmails } from "@/lib/email";
 
 interface RouteParams {
   params: Promise<{ token: string }>;
@@ -90,11 +94,17 @@ export async function POST(request: Request, { params }: RouteParams) {
         );
       }
 
-      const [settings, bookings, blocks] = await Promise.all([
+      const [settings, bookings, blocks, dentists] = await Promise.all([
         getClinicSettings(),
         getAllBookings(),
         getAllScheduleBlocks(),
+        getAllDentists(),
       ]);
+
+      const dentistId =
+        booking.preferredDentistId && !isAnyDentist(booking.preferredDentistId)
+          ? booking.preferredDentistId
+          : ANY_DENTIST_ID;
 
       const slotError = validateSlotBooking({
         date,
@@ -102,6 +112,8 @@ export async function POST(request: Request, { params }: RouteParams) {
         settings,
         bookings,
         blocks,
+        dentists,
+        dentistId,
         excludeToken: token,
       });
 
@@ -126,6 +138,47 @@ export async function POST(request: Request, { params }: RouteParams) {
       return NextResponse.json({
         success: true,
         message: "Appointment rescheduled.",
+        booking: updated,
+      });
+    }
+
+    if (body.action === "late-notice") {
+      if (!isActiveAppointment(booking)) {
+        return NextResponse.json(
+          { error: "Late notices can only be sent for confirmed appointments." },
+          { status: 400 }
+        );
+      }
+
+      if (!canReportLateArrival(booking)) {
+        return NextResponse.json(
+          { error: "Late arrival notices are only available on the day of your appointment." },
+          { status: 400 }
+        );
+      }
+
+      const minutesLate =
+        typeof body.minutesLate === "number"
+          ? body.minutesLate
+          : Number.parseInt(String(body.minutesLate ?? ""), 10);
+      const note = typeof body.note === "string" ? body.note.trim().slice(0, 500) : "";
+
+      const updated = await updateBooking(token, {
+        lateNoticeAt: new Date().toISOString(),
+        lateNoticeMinutes:
+          Number.isFinite(minutesLate) && minutesLate > 0 ? minutesLate : undefined,
+        lateNoticeNote: note || undefined,
+      });
+
+      if (!updated) {
+        return NextResponse.json({ error: "Failed to send late notice." }, { status: 500 });
+      }
+
+      await sendLateNoticeEmails(updated, siteUrl);
+
+      return NextResponse.json({
+        success: true,
+        message: "Thanks — we've notified the clinic that you're running late.",
         booking: updated,
       });
     }

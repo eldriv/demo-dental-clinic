@@ -9,16 +9,23 @@ import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import type { ClinicDentist } from "@/lib/dentists";
 import { findDentistName } from "@/lib/dentists";
 import {
+  countBookedSlots,
   countOpenSlots,
+  countPendingSlots,
+  filterBookingsForDentist,
   formatDayLabel,
   formatMonthLabel,
   getBookingsForDate,
   getDayAvailability,
+  getDayCellLabel,
+  getDayCellSurfaceClass,
+  getDayCellToneClass,
   getDaySummary,
   getMonthGrid,
   isPastDate,
   toDateString,
 } from "@/lib/admin-calendar";
+import { isAnyDentist } from "@/lib/dentist-availability";
 
 interface AdminCalendarViewProps {
   initialBookings: Booking[];
@@ -39,32 +46,43 @@ export function AdminCalendarView({
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [selectedDate, setSelectedDate] = useState(toDateString(today));
+  const [selectedDentistId, setSelectedDentistId] = useState(dentists[0]?.id ?? "");
 
   const todayString = toDateString(today);
+  const selectedDentist = dentists.find((dentist) => dentist.id === selectedDentistId);
 
   const monthGrid = useMemo(
     () => getMonthGrid(viewYear, viewMonth),
     [viewYear, viewMonth]
   );
 
-  const selectedBookings = useMemo(
-    () => getBookingsForDate(initialBookings, selectedDate),
-    [initialBookings, selectedDate]
-  );
+  const selectedBookings = useMemo(() => {
+    const dayBookings = getBookingsForDate(initialBookings, selectedDate);
+    if (!selectedDentistId) return dayBookings;
 
-  const availability = useMemo(
-    () =>
-      getDayAvailability(
-        initialBookings,
-        initialBlocks,
-        selectedDate,
-        timeSlots
-      ),
-    [initialBookings, initialBlocks, selectedDate, timeSlots]
-  );
+    return filterBookingsForDentist(dayBookings, selectedDentistId);
+  }, [initialBookings, selectedDate, selectedDentistId]);
+
+  const availability = useMemo(() => {
+    if (!selectedDentistId) return [];
+    return getDayAvailability(
+      initialBookings,
+      initialBlocks,
+      selectedDate,
+      timeSlots,
+      selectedDentistId
+    );
+  }, [initialBookings, initialBlocks, selectedDate, timeSlots, selectedDentistId]);
 
   const openSlots = countOpenSlots(availability);
-  const daySummary = getDaySummary(initialBookings, initialBlocks, selectedDate);
+  const bookedSlots = countBookedSlots(availability);
+  const pendingSlots = countPendingSlots(availability);
+  const daySummary = getDaySummary(
+    initialBookings,
+    initialBlocks,
+    selectedDate,
+    selectedDentistId || undefined
+  );
 
   function shiftMonth(delta: number) {
     const next = new Date(viewYear, viewMonth + delta, 1);
@@ -76,8 +94,30 @@ export function AdminCalendarView({
     <div className="space-y-6">
       <AdminPageHeader
         title="Calendar"
-        description="View confirmed appointments and open time slots at a glance."
+        description="View each dentist's approved schedule, pending requests, and open slots."
       />
+
+      {dentists.length > 0 && (
+        <div className="admin-card flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-medium text-dark">Dentist schedule</p>
+            <p className="text-xs text-muted">
+              Open slots exclude approved visits. Pending requests are shown separately.
+            </p>
+          </div>
+          <select
+            value={selectedDentistId}
+            onChange={(e) => setSelectedDentistId(e.target.value)}
+            className="input-field max-w-xs text-sm"
+          >
+            {dentists.map((dentist) => (
+              <option key={dentist.id} value={dentist.id}>
+                {dentist.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
         <section className="admin-card">
@@ -118,14 +158,20 @@ export function AdminCalendarView({
           <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
             {monthGrid.map((date, index) => {
               if (!date) {
-                return <div key={`empty-${index}`} className="min-h-12 rounded-lg sm:min-h-20 sm:rounded-xl" />;
+                return <div key={`empty-${index}`} className="min-h-14 rounded-lg sm:min-h-16" />;
               }
 
               const dateString = toDateString(date);
-              const summary = getDaySummary(initialBookings, initialBlocks, dateString);
+              const summary = getDaySummary(
+                initialBookings,
+                initialBlocks,
+                dateString,
+                selectedDentistId || undefined
+              );
               const isSelected = selectedDate === dateString && !isPastDate(dateString, todayString);
               const isToday = dateString === todayString;
               const isPast = isPastDate(dateString, todayString);
+              const cell = getDayCellLabel(summary, isPast);
 
               return (
                 <button
@@ -134,79 +180,48 @@ export function AdminCalendarView({
                   disabled={isPast}
                   onClick={() => setSelectedDate(dateString)}
                   aria-disabled={isPast}
-                  className={`min-h-12 rounded-lg border p-1 text-left transition-colors sm:min-h-20 sm:rounded-xl sm:p-2 ${
-                    isPast
-                      ? "cursor-not-allowed border-gray-100 bg-gray-50 opacity-50"
-                      : isSelected
-                        ? "border-primary bg-primary/10"
-                        : "border-gray-100 bg-white hover:border-primary/30 hover:bg-surface"
-                  }`}
+                  aria-label={`${dateString}, ${cell.label}`}
+                  className={`flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-lg border px-1 py-1.5 text-center transition-colors sm:min-h-16 sm:rounded-xl sm:px-1.5 sm:py-2 ${getDayCellSurfaceClass(summary, isPast, isSelected)}`}
                 >
-                  <div className="flex items-start justify-between gap-1">
-                    <span
-                      className={`inline-flex size-6 items-center justify-center rounded-full text-xs font-semibold sm:size-7 sm:text-sm ${
-                        isToday
-                          ? "bg-primary text-white"
-                          : isPast
-                            ? "text-muted"
+                  <span
+                    className={`inline-flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold sm:size-7 sm:text-sm ${
+                      isToday
+                        ? "bg-primary text-white"
+                        : isPast
+                          ? "text-muted"
+                          : summary.blocked && !isPast
+                            ? "text-red-800"
                             : "text-dark"
-                      }`}
-                    >
-                      {date.getDate()}
-                    </span>
-                    {summary.blocked && !isPast && (
-                      <span className="rounded-full bg-red-100 px-1 py-0.5 text-[8px] font-semibold text-red-700 sm:px-1.5 sm:text-[10px]">
-                        Blocked
-                      </span>
-                    )}
-                  </div>
-
-                  {!isPast && summary.total > 0 && (
-                    <span className="mt-1 block size-1.5 rounded-full bg-primary sm:hidden" aria-hidden />
-                  )}
-
-                  <div className="mt-1 hidden space-y-1 sm:mt-2 sm:block">
-                    {isPast ? (
-                      <span className="block text-[11px] text-muted">Past</span>
-                    ) : (
-                      <>
-                        {summary.confirmed > 0 && (
-                          <span className="block text-[11px] font-medium text-primary">
-                            {summary.confirmed} confirmed
-                          </span>
-                        )}
-                        {summary.pending > 0 && (
-                          <span className="block text-[11px] font-medium text-amber-700">
-                            {summary.pending} pending
-                          </span>
-                        )}
-                        {!summary.blocked && summary.total === 0 && (
-                          <span className="block text-[11px] text-muted">Open</span>
-                        )}
-                      </>
-                    )}
-                  </div>
+                    }`}
+                  >
+                    {date.getDate()}
+                  </span>
+                  <span
+                    className={`w-full truncate px-0.5 text-[10px] font-medium leading-tight sm:text-[11px] ${getDayCellToneClass(cell.tone)}`}
+                  >
+                    {cell.label}
+                  </span>
                 </button>
               );
             })}
           </div>
 
-          <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted">
+          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted">
             <span className="flex items-center gap-2">
               <span className="size-3 rounded-full bg-primary" />
-              Confirmed / completed
+              Confirmed
             </span>
             <span className="flex items-center gap-2">
               <span className="size-3 rounded-full bg-amber-500" />
               Pending
             </span>
             <span className="flex items-center gap-2">
-              <span className="size-3 rounded-full bg-red-400" />
-              Blocked day
+              <span className="size-3 rounded-full bg-red-300" />
+              On leave / blocked
             </span>
             <span className="flex items-center gap-2">
               <span className="size-3 rounded-full bg-gray-300" />
-              Past (unavailable)
+              Past
             </span>
           </div>
         </section>
@@ -215,10 +230,15 @@ export function AdminCalendarView({
           <section className="admin-card space-y-4">
             <div>
               <h2 className="text-lg font-semibold text-dark">{formatDayLabel(selectedDate)}</h2>
+              {selectedDentist && (
+                <p className="text-sm font-medium text-primary">{selectedDentist.name}</p>
+              )}
               <p className="text-sm text-muted">
-                {daySummary.blocked
-                  ? "This day is blocked — no appointments available."
-                  : `${openSlots} of ${timeSlots.length} slots open`}
+                {daySummary.onLeave && !daySummary.clinicBlocked
+                  ? "This dentist is on leave — no appointments available."
+                  : daySummary.blocked
+                    ? "This day is blocked — no appointments available."
+                    : `${openSlots} open · ${bookedSlots} approved · ${pendingSlots} pending`}
               </p>
             </div>
 
@@ -231,16 +251,24 @@ export function AdminCalendarView({
                       ? "bg-green-50 text-green-800"
                       : slot.state === "booked"
                         ? "bg-primary/10 text-dark"
-                        : "bg-red-50 text-red-700"
+                        : slot.state === "pending"
+                          ? "bg-amber-50 text-amber-900"
+                          : "bg-red-50 text-red-700"
                   }`}
                 >
                   <span className="font-medium">{slot.time}</span>
                   <span className="text-xs sm:text-left sm:text-inherit">
                     {slot.state === "open" && "Available"}
-                    {slot.state === "blocked" && "Blocked"}
+                    {slot.state === "blocked" && "Blocked / on leave"}
                     {slot.state === "booked" && slot.booking && (
                       <span className="break-words">
-                        {slot.booking.name} · {slot.booking.service}
+                        Approved · {slot.booking.name} · {slot.booking.service}
+                      </span>
+                    )}
+                    {slot.state === "pending" && slot.booking && (
+                      <span className="break-words">
+                        Pending · {slot.booking.name} · {slot.booking.service}
+                        {isAnyDentist(slot.booking.preferredDentistId) ? " · Any doctor" : ""}
                       </span>
                     )}
                   </span>
@@ -266,13 +294,19 @@ export function AdminCalendarView({
                         <p className="text-sm text-muted">
                           {entry.time} · {entry.service}
                           {entry.assignedDentistName ||
-                            findDentistName(dentists, entry.assignedDentistId) ? (
+                          entry.preferredDentistName ||
+                          findDentistName(dentists, entry.assignedDentistId) ||
+                          findDentistName(dentists, entry.preferredDentistId) ? (
                             <>
                               {" "}
                               ·{" "}
                               {entry.assignedDentistName ??
-                                findDentistName(dentists, entry.assignedDentistId)}
+                                entry.preferredDentistName ??
+                                findDentistName(dentists, entry.assignedDentistId) ??
+                                findDentistName(dentists, entry.preferredDentistId)}
                             </>
+                          ) : isAnyDentist(entry.preferredDentistId) ? (
+                            <> · Any doctor</>
                           ) : null}
                         </p>
                       </div>

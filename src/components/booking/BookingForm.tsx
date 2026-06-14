@@ -4,6 +4,14 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { services, site } from "@/content";
 import { BOOKING_SERVICE_EVENT } from "@/lib/booking-selection";
+import { ANY_DENTIST_ID } from "@/lib/booking-availability";
+import type { TimeSlotOption } from "@/lib/booking-availability";
+import { BookingSchedulePicker } from "@/components/booking/BookingSchedulePicker";
+
+interface PublicDentist {
+  id: string;
+  name: string;
+}
 
 interface BookingFormProps {
   className?: string;
@@ -15,11 +23,24 @@ export function BookingForm({ className = "" }: BookingFormProps) {
   const [manageUrl, setManageUrl] = useState("");
   const [selectedService, setSelectedService] = useState("");
   const [serviceHighlight, setServiceHighlight] = useState(false);
+  const [dentists, setDentists] = useState<PublicDentist[]>([]);
+  const [dentistsLoading, setDentistsLoading] = useState(true);
+  const [selectedDentistId, setSelectedDentistId] = useState(ANY_DENTIST_ID);
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedTime, setSelectedTime] = useState("");
-  const [timeSlots, setTimeSlots] = useState<string[]>([]);
+  const [timeSlots, setTimeSlots] = useState<TimeSlotOption[]>([]);
   const [dateClosed, setDateClosed] = useState(false);
   const [slotsLoading, setSlotsLoading] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/dentists")
+      .then((res) => res.json())
+      .then((data) => {
+        setDentists(data.dentists ?? []);
+      })
+      .catch(() => setDentists([]))
+      .finally(() => setDentistsLoading(false));
+  }, []);
 
   useEffect(() => {
     const prefill = sessionStorage.getItem("prefillService");
@@ -55,13 +76,19 @@ export function BookingForm({ className = "" }: BookingFormProps) {
     }
 
     setSlotsLoading(true);
-    fetch(`/api/availability?date=${encodeURIComponent(selectedDate)}`)
+    const params = new URLSearchParams({
+      date: selectedDate,
+      dentistId: selectedDentistId,
+    });
+
+    fetch(`/api/availability?${params}`)
       .then((res) => res.json())
       .then((data) => {
         setDateClosed(Boolean(data.closed));
-        setTimeSlots(data.timeSlots ?? []);
+        const slots: TimeSlotOption[] = data.slots ?? [];
+        setTimeSlots(slots);
         setSelectedTime((current) =>
-          data.timeSlots?.includes(current) ? current : ""
+          slots.some((slot) => slot.time === current && slot.available) ? current : ""
         );
       })
       .catch(() => {
@@ -69,7 +96,7 @@ export function BookingForm({ className = "" }: BookingFormProps) {
         setDateClosed(false);
       })
       .finally(() => setSlotsLoading(false));
-  }, [selectedDate]);
+  }, [selectedDate, selectedDentistId]);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -88,6 +115,7 @@ export function BookingForm({ className = "" }: BookingFormProps) {
           email: formData.get("email"),
           phone: formData.get("phone"),
           service: formData.get("service"),
+          dentistId: selectedDentistId,
           date: formData.get("date"),
           time: formData.get("time"),
         }),
@@ -107,6 +135,7 @@ export function BookingForm({ className = "" }: BookingFormProps) {
         setManageUrl(`/manage/${data.booking.token}`);
       }
       setSelectedService("");
+      setSelectedDentistId(ANY_DENTIST_ID);
       setSelectedDate("");
       setSelectedTime("");
       form.reset();
@@ -118,11 +147,9 @@ export function BookingForm({ className = "" }: BookingFormProps) {
     }
   }
 
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const minDate = tomorrow.toISOString().split("T")[0];
-
-  const cannotBookDate = selectedDate.length > 0 && (dateClosed || timeSlots.length === 0);
+  const hasAvailableSlot = timeSlots.some((slot) => slot.available);
+  const cannotBookDate =
+    selectedDate.length > 0 && (dateClosed || (!slotsLoading && !hasAvailableSlot));
 
   return (
     <div className={className}>
@@ -217,59 +244,46 @@ export function BookingForm({ className = "" }: BookingFormProps) {
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label htmlFor="date" className="mb-1.5 block text-sm font-medium text-gray-700">
-                Preferred Date *
-              </label>
-              <input
-                id="date"
-                name="date"
-                type="date"
-                required
-                min={minDate}
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="input-field"
-              />
-              {selectedDate && dateClosed && (
-                <p className="mt-1 text-xs text-red-600">
-                  The clinic is closed on this day. Please choose another date.
-                </p>
-              )}
-            </div>
-            <div>
-              <label htmlFor="time" className="mb-1.5 block text-sm font-medium text-gray-700">
-                Preferred Time *
-              </label>
-              <select
-                id="time"
-                name="time"
-                required
-                value={selectedTime}
-                onChange={(e) => setSelectedTime(e.target.value)}
-                disabled={!selectedDate || slotsLoading || cannotBookDate}
-                className="input-field disabled:opacity-60"
-              >
-                <option value="">
-                  {!selectedDate
-                    ? "Select a date first"
-                    : slotsLoading
-                      ? "Loading times…"
-                      : dateClosed
-                        ? "Closed on this day"
-                        : timeSlots.length === 0
-                          ? "No times available"
-                          : "Select a time"}
+          <div>
+            <label htmlFor="dentist" className="mb-1.5 block text-sm font-medium text-gray-700">
+              Preferred Dentist *
+            </label>
+            <select
+              id="dentist"
+              name="dentist"
+              required
+              value={selectedDentistId}
+              onChange={(e) => setSelectedDentistId(e.target.value)}
+              disabled={dentistsLoading}
+              className="input-field disabled:opacity-60"
+            >
+              <option value={ANY_DENTIST_ID}>Any doctor</option>
+              {dentists.map((dentist) => (
+                <option key={dentist.id} value={dentist.id}>
+                  {dentist.name}
                 </option>
-                {timeSlots.map((slot) => (
-                  <option key={slot} value={slot}>
-                    {slot}
-                  </option>
-                ))}
-              </select>
-            </div>
+              ))}
+            </select>
+            {!dentistsLoading && dentists.length === 0 && (
+              <p className="mt-1 text-xs text-muted">
+                Dentist list loading unavailable — you can still choose Any doctor.
+              </p>
+            )}
           </div>
+
+          <BookingSchedulePicker
+            dateId="date"
+            timeId="time"
+            selectedDate={selectedDate}
+            selectedTime={selectedTime}
+            onDateChange={setSelectedDate}
+            onTimeChange={setSelectedTime}
+            dentistId={selectedDentistId}
+            timeSlots={timeSlots}
+            slotsLoading={slotsLoading}
+            dateClosed={dateClosed}
+            cannotBookDate={cannotBookDate}
+          />
 
           {status === "error" && (
             <div className="flex items-start gap-2 rounded-xl bg-red-50 p-4 text-sm text-red-700 ring-1 ring-red-100">

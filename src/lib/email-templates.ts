@@ -124,7 +124,10 @@ export function buildBrandedEmail(options: EmailLayoutOptions): string {
 }
 
 export function bookingDetailRows(booking: Booking): Array<{ label: string; value: string }> {
-  const dentistName = booking.assignedDentistName;
+  const dentistName =
+    booking.assignedDentistName ??
+    booking.preferredDentistName ??
+    (booking.preferredDentistId ? undefined : "Any doctor");
   const rows = [
     { label: "Patient", value: booking.name },
     { label: "Email", value: booking.email },

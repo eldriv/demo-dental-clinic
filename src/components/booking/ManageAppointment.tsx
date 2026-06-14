@@ -5,6 +5,15 @@ import { Loader2, AlertCircle, CheckCircle } from "lucide-react";
 import { site } from "@/content";
 import type { Booking } from "@/lib/bookings";
 import { isRescheduledPatient } from "@/lib/booking-status";
+import { ANY_DENTIST_ID } from "@/lib/booking-availability";
+import type { TimeSlotOption } from "@/lib/booking-availability";
+import { BookingSchedulePicker } from "@/components/booking/BookingSchedulePicker";
+import { isAnyDentist } from "@/lib/dentist-availability";
+import {
+  canReportLateArrival,
+  formatLateNoticeSummary,
+  isActiveAppointment,
+} from "@/lib/appointment-attendance";
 
 interface ManageAppointmentProps {
   initialBooking: Booking;
@@ -12,18 +21,23 @@ interface ManageAppointmentProps {
 
 export function ManageAppointment({ initialBooking }: ManageAppointmentProps) {
   const [bookingData, setBookingData] = useState(initialBooking);
-  const [mode, setMode] = useState<"view" | "reschedule" | "cancel">("view");
+  const [mode, setMode] = useState<"view" | "reschedule" | "cancel" | "late">("view");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
+  const [lateMinutes, setLateMinutes] = useState("15");
+  const [lateNote, setLateNote] = useState("");
   const [rescheduleDate, setRescheduleDate] = useState(initialBooking.date);
   const [rescheduleTime, setRescheduleTime] = useState(initialBooking.time);
-  const [timeSlots, setTimeSlots] = useState<string[]>([]);
+  const [timeSlots, setTimeSlots] = useState<TimeSlotOption[]>([]);
   const [dateClosed, setDateClosed] = useState(false);
   const [slotsLoading, setSlotsLoading] = useState(false);
 
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const minDate = tomorrow.toISOString().split("T")[0];
+  const dentistId =
+    bookingData.preferredDentistId && !isAnyDentist(bookingData.preferredDentistId)
+      ? bookingData.preferredDentistId
+      : bookingData.assignedDentistId && !isAnyDentist(bookingData.assignedDentistId)
+        ? bookingData.assignedDentistId
+        : ANY_DENTIST_ID;
 
   useEffect(() => {
     if (mode !== "reschedule" || !rescheduleDate) {
@@ -34,22 +48,26 @@ export function ManageAppointment({ initialBooking }: ManageAppointmentProps) {
     const params = new URLSearchParams({
       date: rescheduleDate,
       excludeToken: bookingData.token,
+      dentistId,
     });
 
     fetch(`/api/availability?${params}`)
       .then((res) => res.json())
       .then((data) => {
         setDateClosed(Boolean(data.closed));
-        const slots: string[] = data.timeSlots ?? [];
+        const slots: TimeSlotOption[] = data.slots ?? [];
         setTimeSlots(slots);
-        setRescheduleTime((current) => (slots.includes(current) ? current : slots[0] ?? ""));
+        setRescheduleTime((current) => {
+          if (slots.some((slot) => slot.time === current && slot.available)) return current;
+          return slots.find((slot) => slot.available)?.time ?? "";
+        });
       })
       .catch(() => {
         setTimeSlots([]);
         setDateClosed(false);
       })
       .finally(() => setSlotsLoading(false));
-  }, [mode, rescheduleDate, bookingData.token]);
+  }, [mode, rescheduleDate, bookingData.token, dentistId]);
 
   async function handleReschedule(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -88,6 +106,39 @@ export function ManageAppointment({ initialBooking }: ManageAppointmentProps) {
     }
   }
 
+  async function handleLateNotice(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setStatus("loading");
+    setMessage("");
+
+    try {
+      const res = await fetch(`/api/bookings/${bookingData.token}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "late-notice",
+          minutesLate: lateMinutes ? Number(lateMinutes) : undefined,
+          note: lateNote,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setStatus("error");
+        setMessage(data.error ?? "Failed to send late notice.");
+        return;
+      }
+
+      setBookingData(data.booking);
+      setStatus("success");
+      setMessage(data.message ?? "Late arrival notice sent to the clinic.");
+      setMode("view");
+    } catch {
+      setStatus("error");
+      setMessage(`Unable to send notice. Please call ${site.contact.phones[0]}.`);
+    }
+  }
+
   async function handleCancel() {
     if (!confirm("Are you sure you want to cancel this appointment?")) return;
 
@@ -121,9 +172,12 @@ export function ManageAppointment({ initialBooking }: ManageAppointmentProps) {
   const isCancelled = bookingData.status === "cancelled";
   const isCompleted = bookingData.status === "completed";
   const canManage = !isCancelled && !isCompleted;
+  const canLateNotice = canReportLateArrival(bookingData);
+  const showLateBanner = Boolean(bookingData.lateNoticeAt) && isActiveAppointment(bookingData);
+  const hasAvailableSlot = timeSlots.some((slot) => slot.available);
   const cannotPickTime =
     mode === "reschedule" &&
-    (dateClosed || slotsLoading || timeSlots.length === 0);
+    (dateClosed || slotsLoading || !hasAvailableSlot);
 
   return (
     <div className="card max-w-lg mx-auto">
@@ -173,6 +227,12 @@ export function ManageAppointment({ initialBooking }: ManageAppointmentProps) {
         </p>
       )}
 
+      {showLateBanner && (
+        <p className="mb-6 rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-900">
+          {formatLateNoticeSummary(bookingData)} — the clinic has been notified.
+        </p>
+      )}
+
       {bookingData.status === "declined" && (
         <p className="mb-6 rounded-xl bg-orange-50 px-4 py-3 text-sm text-orange-900">
           Your requested time is not available. Please choose a new date and time below.
@@ -193,9 +253,19 @@ export function ManageAppointment({ initialBooking }: ManageAppointmentProps) {
           ["Service", bookingData.service],
           ["Date", bookingData.date],
           ["Time", bookingData.time],
-          ...(bookingData.assignedDentistName || bookingData.assignedDentistId
-            ? [["Dentist", bookingData.assignedDentistName ?? bookingData.assignedDentistId]]
-            : []),
+          ...(bookingData.assignedDentistName ||
+          bookingData.preferredDentistName ||
+          bookingData.assignedDentistId ||
+          bookingData.preferredDentistId
+            ? [
+                [
+                  "Dentist",
+                  bookingData.assignedDentistName ??
+                    bookingData.preferredDentistName ??
+                    (isAnyDentist(bookingData.preferredDentistId) ? "Any doctor" : "Assigned at approval"),
+                ],
+              ]
+            : [["Dentist", "Any doctor"]]),
         ].map(([label, value]) => (
           <div key={label} className="flex justify-between gap-4 border-b border-gray-100 pb-3">
             <dt className="text-sm font-medium text-muted">{label}</dt>
@@ -206,6 +276,19 @@ export function ManageAppointment({ initialBooking }: ManageAppointmentProps) {
 
       {canManage && mode === "view" && (
         <div className="mt-8 flex flex-wrap gap-3">
+          {canLateNotice && !bookingData.lateNoticeAt && (
+            <button
+              type="button"
+              onClick={() => {
+                setMode("late");
+                setStatus("idle");
+                setMessage("");
+              }}
+              className="btn-outline flex-1"
+            >
+              Running late?
+            </button>
+          )}
           <button
             type="button"
             onClick={() => {
@@ -237,55 +320,22 @@ export function ManageAppointment({ initialBooking }: ManageAppointmentProps) {
       {mode === "reschedule" && canManage && (
         <form onSubmit={handleReschedule} className="mt-8 space-y-4">
           <h3 className="font-semibold text-dark">Reschedule Appointment</h3>
-          <div>
-            <label htmlFor="date" className="mb-1.5 block text-sm font-medium text-gray-700">
-              New Date
-            </label>
-            <input
-              id="date"
-              name="date"
-              type="date"
-              required
-              min={minDate}
-              value={rescheduleDate}
-              onChange={(e) => setRescheduleDate(e.target.value)}
-              className="input-field"
-            />
-            {dateClosed && (
-              <p className="mt-1 text-xs text-red-600">
-                The clinic is closed on this day. Please choose another date.
-              </p>
-            )}
-          </div>
-          <div>
-            <label htmlFor="time" className="mb-1.5 block text-sm font-medium text-gray-700">
-              New Time
-            </label>
-            <select
-              id="time"
-              name="time"
-              required
-              value={rescheduleTime}
-              onChange={(e) => setRescheduleTime(e.target.value)}
-              disabled={cannotPickTime}
-              className="input-field disabled:opacity-60"
-            >
-              <option value="">
-                {slotsLoading
-                  ? "Loading times…"
-                  : dateClosed
-                    ? "Closed on this day"
-                    : timeSlots.length === 0
-                      ? "No times available"
-                      : "Select a time"}
-              </option>
-              {timeSlots.map((slot) => (
-                <option key={slot} value={slot}>
-                  {slot}
-                </option>
-              ))}
-            </select>
-          </div>
+          <BookingSchedulePicker
+            dateId="date"
+            timeId="time"
+            selectedDate={rescheduleDate}
+            selectedTime={rescheduleTime}
+            onDateChange={setRescheduleDate}
+            onTimeChange={setRescheduleTime}
+            dentistId={dentistId}
+            excludeToken={bookingData.token}
+            timeSlots={timeSlots}
+            slotsLoading={slotsLoading}
+            dateClosed={dateClosed}
+            cannotBookDate={
+              rescheduleDate.length > 0 && (dateClosed || (!slotsLoading && !hasAvailableSlot))
+            }
+          />
           <div className="flex gap-3">
             <button
               type="submit"
@@ -303,6 +353,59 @@ export function ManageAppointment({ initialBooking }: ManageAppointmentProps) {
               onClick={() => setMode("view")}
               className="btn-outline flex-1"
             >
+              Back
+            </button>
+          </div>
+        </form>
+      )}
+
+      {mode === "late" && canManage && (
+        <form onSubmit={handleLateNotice} className="mt-8 space-y-4">
+          <h3 className="font-semibold text-dark">Late Arrival Notice</h3>
+          <p className="text-sm text-muted">
+            Let the front desk know you&apos;re on your way. They&apos;ll see this on the dashboard
+            right away.
+          </p>
+          <div>
+            <label htmlFor="late-minutes" className="mb-1.5 block text-sm font-medium text-gray-700">
+              About how many minutes late? (optional)
+            </label>
+            <select
+              id="late-minutes"
+              value={lateMinutes}
+              onChange={(e) => setLateMinutes(e.target.value)}
+              className="input-field"
+            >
+              <option value="">Not sure</option>
+              <option value="10">~10 minutes</option>
+              <option value="15">~15 minutes</option>
+              <option value="20">~20 minutes</option>
+              <option value="30">~30 minutes</option>
+              <option value="45">~45 minutes</option>
+            </select>
+          </div>
+          <div>
+            <label htmlFor="late-note" className="mb-1.5 block text-sm font-medium text-gray-700">
+              Note for the clinic (optional)
+            </label>
+            <textarea
+              id="late-note"
+              value={lateNote}
+              onChange={(e) => setLateNote(e.target.value)}
+              rows={2}
+              className="input-field text-sm"
+              placeholder="Stuck in traffic, etc."
+            />
+          </div>
+          <div className="flex gap-3">
+            <button type="submit" disabled={status === "loading"} className="btn-cta flex-1">
+              {status === "loading" ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                "Notify clinic"
+              )}
+            </button>
+            <button type="button" onClick={() => setMode("view")} className="btn-outline flex-1">
               Back
             </button>
           </div>

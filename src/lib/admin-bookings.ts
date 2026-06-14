@@ -7,11 +7,20 @@ import {
 } from "@/lib/email";
 import type { Booking } from "@/lib/bookings";
 import { buildManageUrl } from "@/lib/site-url";
-import { getDentistById, isValidDentistId } from "@/lib/dentists-store";
+import { validateSlotBooking, ANY_DENTIST_ID } from "@/lib/booking-availability";
+import { getAllDentists, getDentistById, isValidDentistId } from "@/lib/dentists-store";
+import { isAnyDentist } from "@/lib/dentist-availability";
 import { getClinicSettings } from "@/lib/clinic-settings-store";
 import { getAllScheduleBlocks } from "@/lib/schedule-blocks";
-import { validateSlotBooking } from "@/lib/booking-availability";
 import { needsStaffApproval } from "@/lib/booking-status";
+import { isActiveAppointment } from "@/lib/appointment-attendance";
+import { sortBookingsByDateTime } from "@/lib/admin-booking-filters";
+
+export {
+  filterTodayBookings,
+  getTodayDateString,
+  isTodayVisit,
+} from "@/lib/admin-booking-filters";
 
 export async function approveBooking(
   token: string,
@@ -30,7 +39,11 @@ export async function approveBooking(
     return { booking };
   }
 
-  const assignedDentistId = options?.assignedDentistId?.trim();
+  const assignedDentistId =
+    options?.assignedDentistId?.trim() ||
+    booking.preferredDentistId ||
+    undefined;
+
   if (options?.requireDentist && !assignedDentistId) {
     return { error: "Please select a dentist before approving." };
   }
@@ -42,10 +55,11 @@ export async function approveBooking(
     ? await getDentistById(assignedDentistId)
     : undefined;
 
-  const [settings, bookings, blocks] = await Promise.all([
+  const [settings, bookings, blocks, dentists] = await Promise.all([
     getClinicSettings(),
     getAllBookings(),
     getAllScheduleBlocks(),
+    getAllDentists(),
   ]);
 
   const slotError = validateSlotBooking({
@@ -54,6 +68,8 @@ export async function approveBooking(
     settings,
     bookings,
     blocks,
+    dentists,
+    dentistId: assignedDentistId ?? ANY_DENTIST_ID,
     excludeToken: token,
   });
 
@@ -112,7 +128,10 @@ export async function completeBooking(
     return { error: "Approve the booking before marking it completed." };
   }
 
-  const updated = await updateBooking(token, { status: "completed" });
+  const updated = await updateBooking(token, {
+    status: "completed",
+    completedAt: new Date().toISOString(),
+  });
   if (!updated) return { error: "Failed to update booking." };
   return { booking: updated };
 }
@@ -137,32 +156,23 @@ export async function cancelBookingAdmin(
   return { booking: updated };
 }
 
-export function sortBookingsByDateTime(bookings: Booking[]): Booking[] {
-  return [...bookings].sort((a, b) => {
-    const aKey = `${a.date}T${a.time}`;
-    const bKey = `${b.date}T${b.time}`;
-    return aKey.localeCompare(bKey);
+export async function confirmPatientAttendance(
+  token: string
+): Promise<{ booking?: Booking; error?: string }> {
+  const booking = await getBookingByToken(token);
+  if (!booking) return { error: "Booking not found." };
+  if (!isActiveAppointment(booking)) {
+    return { error: "Only confirmed appointments can be marked as still attending." };
+  }
+
+  const now = new Date().toISOString();
+  const updated = await updateBooking(token, {
+    attendanceConfirmed: true,
+    attendanceConfirmedAt: now,
   });
-}
 
-export function getTodayDateString(): string {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, "0");
-  const day = String(today.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-export function filterTodayBookings(bookings: Booking[]): Booking[] {
-  const today = getTodayDateString();
-  return sortBookingsByDateTime(
-    bookings.filter(
-      (booking) =>
-        booking.date === today &&
-        booking.status !== "cancelled" &&
-        booking.status !== "declined"
-    )
-  );
+  if (!updated) return { error: "Failed to update booking." };
+  return { booking: updated };
 }
 
 export function getManageLink(token: string, siteUrl?: string): string {

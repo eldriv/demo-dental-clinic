@@ -8,7 +8,9 @@ import { getSiteUrlFromRequest, buildManageUrl } from "@/lib/site-url";
 import { site } from "@/content";
 import { getClinicSettings } from "@/lib/clinic-settings-store";
 import { getAllScheduleBlocks } from "@/lib/schedule-blocks";
-import { validateSlotBooking } from "@/lib/booking-availability";
+import { getAllDentists } from "@/lib/dentists-store";
+import { ANY_DENTIST_ID, validateSlotBooking } from "@/lib/booking-availability";
+import { isAnyDentist } from "@/lib/dentist-availability";
 
 function validateBookingFields(body: CreateBookingInput): string | null {
   const { name, email, phone, service, date, time } = body;
@@ -44,10 +46,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: fieldError }, { status: 400 });
     }
 
-    const [settings, bookings, blocks] = await Promise.all([
+    const dentistId = body.dentistId?.trim() || ANY_DENTIST_ID;
+
+    const [settings, bookings, blocks, dentists] = await Promise.all([
       getClinicSettings(),
       getAllBookings(),
       getAllScheduleBlocks(),
+      getAllDentists(),
     ]);
 
     const slotError = validateSlotBooking({
@@ -56,11 +61,17 @@ export async function POST(request: Request) {
       settings,
       bookings,
       blocks,
+      dentists,
+      dentistId,
     });
 
     if (slotError) {
       return NextResponse.json({ error: slotError }, { status: 400 });
     }
+
+    const preferredDentist = isAnyDentist(dentistId)
+      ? undefined
+      : dentists.find((entry) => entry.id === dentistId);
 
     const now = new Date().toISOString();
     const token = uuidv4();
@@ -77,6 +88,12 @@ export async function POST(request: Request) {
       status: "pending",
       createdAt: now,
       updatedAt: now,
+      ...(preferredDentist
+        ? {
+            preferredDentistId: preferredDentist.id,
+            preferredDentistName: preferredDentist.name,
+          }
+        : {}),
     };
 
     await saveBooking(booking);
@@ -101,6 +118,7 @@ export async function POST(request: Request) {
         date: booking.date,
         time: booking.time,
         service: booking.service,
+        preferredDentistName: booking.preferredDentistName,
       },
     });
   } catch (err) {

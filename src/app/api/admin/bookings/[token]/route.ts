@@ -63,6 +63,15 @@ export async function POST(request: Request, { params }: RouteParams) {
       return NextResponse.json({ success: true, booking: result.booking });
     }
 
+    if (action === "confirm-attendance") {
+      const { confirmPatientAttendance } = await import("@/lib/admin-bookings");
+      const result = await confirmPatientAttendance(token);
+      if (result.error) {
+        return NextResponse.json({ error: result.error }, { status: 400 });
+      }
+      return NextResponse.json({ success: true, booking: result.booking });
+    }
+
     return NextResponse.json({ error: "Invalid action." }, { status: 400 });
   } catch {
     return NextResponse.json({ error: "Action failed." }, { status: 500 });

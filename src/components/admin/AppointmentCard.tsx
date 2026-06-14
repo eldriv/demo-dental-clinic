@@ -1,11 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Calendar, Loader2, Mail, Phone, Stethoscope } from "lucide-react";
+import { Calendar, Loader2, Mail, Phone, Stethoscope, AlertTriangle } from "lucide-react";
 import type { Booking } from "@/lib/bookings";
 import { StatusBadge, formatBookingWhen } from "@/components/admin/StatusBadge";
 import { useAdminDentists } from "@/components/admin/useAdminDentists";
 import { needsStaffApproval } from "@/lib/booking-status";
+import {
+  formatLateNoticeSummary,
+  needsNoShowAlert,
+} from "@/lib/appointment-attendance";
 
 interface AppointmentActionsProps {
   booking: Booking;
@@ -17,20 +21,22 @@ export function AppointmentActions({ booking, onUpdated }: AppointmentActionsPro
   const [loading, setLoading] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [assignedDentistId, setAssignedDentistId] = useState(
-    booking.assignedDentistId ?? dentists[0]?.id ?? ""
+    booking.assignedDentistId ?? booking.preferredDentistId ?? dentists[0]?.id ?? ""
   );
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!assignedDentistId && dentists[0]?.id) {
-      setAssignedDentistId(dentists[0].id);
+    const next =
+      booking.assignedDentistId ?? booking.preferredDentistId ?? dentists[0]?.id ?? "";
+    if (next && next !== assignedDentistId) {
+      setAssignedDentistId(next);
     }
-  }, [assignedDentistId, dentists]);
+  }, [booking.assignedDentistId, booking.preferredDentistId, dentists, assignedDentistId]);
 
-  async function runAction(action: "approve" | "decline" | "complete" | "cancel") {
+  async function runAction(action: "approve" | "decline" | "complete" | "cancel" | "confirm-attendance") {
     if (action === "cancel") {
       const confirmed = window.confirm(
-        `Cancel the appointment for ${booking.name} on ${booking.date} at ${booking.time}? The patient will be notified by email.`
+        `Cancel the appointment for ${booking.name} on ${booking.date} at ${booking.time}? The time slot will be freed on the website immediately.`
       );
       if (!confirmed) return;
     }
@@ -72,6 +78,8 @@ export function AppointmentActions({ booking, onUpdated }: AppointmentActionsPro
     booking.status === "confirmed" || booking.status === "rescheduled";
   const canCancel =
     booking.status !== "cancelled" && booking.status !== "completed";
+  const showNoShowAlert = needsNoShowAlert(booking);
+  const canConfirmAttendance = showNoShowAlert;
 
   return (
     <div className="space-y-4 border-t border-gray-100 pt-4">
@@ -120,6 +128,20 @@ export function AppointmentActions({ booking, onUpdated }: AppointmentActionsPro
       )}
 
       <div className="admin-actions-bar">
+        {canConfirmAttendance && (
+          <button
+            type="button"
+            disabled={!!loading}
+            onClick={() => runAction("confirm-attendance")}
+            className="btn-cta btn-cta-sm"
+          >
+            {loading === "confirm-attendance" ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              "Patient still coming"
+            )}
+          </button>
+        )}
         {canApprove && (
           <button
             type="button"
@@ -157,7 +179,7 @@ export function AppointmentActions({ booking, onUpdated }: AppointmentActionsPro
             onClick={() => runAction("cancel")}
             className="btn-outline btn-cta-sm btn-outline-danger"
           >
-            {loading === "cancel" ? <Loader2 className="size-4 animate-spin" /> : "Cancel"}
+            {loading === "cancel" ? <Loader2 className="size-4 animate-spin" /> : "Cancel & free slot"}
           </button>
         )}
         <a
@@ -182,7 +204,12 @@ interface AppointmentCardProps {
 
 export function AppointmentCard({ booking, onUpdated }: AppointmentCardProps) {
   const dentistLabel =
-    booking.assignedDentistName ?? booking.assignedDentistId ?? null;
+    booking.assignedDentistName ??
+    booking.preferredDentistName ??
+    (booking.preferredDentistId || booking.assignedDentistId
+      ? booking.preferredDentistId ?? booking.assignedDentistId
+      : null);
+  const showNoShowAlert = needsNoShowAlert(booking);
 
   return (
     <article className="admin-card transition-shadow hover:shadow-[0_12px_40px_rgba(26,60,52,0.08)]">
@@ -193,6 +220,25 @@ export function AppointmentCard({ booking, onUpdated }: AppointmentCardProps) {
         </div>
         <StatusBadge booking={booking} />
       </div>
+
+      {showNoShowAlert && (
+        <div className="admin-info-banner admin-info-banner-amber mt-4">
+          <AlertTriangle className="size-4 shrink-0" />
+          <p>Past 30-minute threshold — contact the patient to confirm if they&apos;re still coming.</p>
+        </div>
+      )}
+
+      {booking.lateNoticeAt && (
+        <div className="admin-info-banner admin-info-banner-blue mt-4">
+          <p>{formatLateNoticeSummary(booking)}</p>
+        </div>
+      )}
+
+      {booking.attendanceConfirmed && (
+        <div className="mt-4 rounded-xl bg-green-50 px-3 py-2 text-sm text-green-800">
+          Reception confirmed patient is still attending.
+        </div>
+      )}
 
       {booking.rescheduledByPatient && (
         <div className="admin-info-banner admin-info-banner-blue mt-4">
@@ -221,7 +267,15 @@ export function AppointmentCard({ booking, onUpdated }: AppointmentCardProps) {
               <Stethoscope className="size-3.5" />
               Dentist
             </dt>
-            <dd className="admin-detail-value">{dentistLabel}</dd>
+            <dd className="admin-detail-value">
+              {dentistLabel}
+              {!booking.assignedDentistId && booking.preferredDentistName && (
+                <span className="ml-1 text-xs font-normal text-muted">(preferred)</span>
+              )}
+              {!booking.assignedDentistId && !booking.preferredDentistName && !booking.preferredDentistId && (
+                <span className="ml-1 text-xs font-normal text-muted">(any doctor)</span>
+              )}
+            </dd>
           </div>
         )}
         <div className="admin-detail-item sm:col-span-2">
