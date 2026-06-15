@@ -1,11 +1,12 @@
 import { getStore } from "@netlify/blobs";
 import type { ClinicDentist } from "./dentists";
 import {
-  DEFAULT_DENTISTS,
   findDentistName,
   isDentistIdValid,
   slugifyDentistName,
 } from "./dentists";
+import { purgeLegacyDemoData } from "./legacy-demo-data-purge";
+import { filterLegacySeedDentists } from "./legacy-demo-purge";
 import { shouldUseNetlifyBlobs } from "./storage-env";
 
 const BLOB_STORE = "bookings";
@@ -60,20 +61,10 @@ async function writeStoredDentists(dentists: ClinicDentist[]): Promise<void> {
   }
 }
 
-async function seedDefaultsIfEmpty(): Promise<ClinicDentist[]> {
-  const stored = await readStoredDentists();
-  if (stored.length > 0) return stored;
-
-  const seeded: ClinicDentist[] = DEFAULT_DENTISTS.map((dentist) => ({
-    ...dentist,
-    createdAt: new Date().toISOString(),
-  }));
-  await writeStoredDentists(seeded);
-  return seeded;
-}
-
 export async function getAllDentists(): Promise<ClinicDentist[]> {
-  return seedDefaultsIfEmpty();
+  await purgeLegacyDemoData();
+  const dentists = await readStoredDentists();
+  return filterLegacySeedDentists(dentists);
 }
 
 export async function findDentistByIdWithRetry(
@@ -85,8 +76,7 @@ export async function findDentistByIdWithRetry(
 
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     const dentists = await readStoredDentists();
-    const list = dentists.length > 0 ? dentists : await seedDefaultsIfEmpty();
-    const match = list.find((dentist) => dentist.id === dentistId);
+    const match = dentists.find((dentist) => dentist.id === dentistId);
     if (match) return match;
     if (attempt < attempts - 1) {
       await new Promise((resolve) => setTimeout(resolve, 120));
@@ -113,9 +103,8 @@ export async function addDentist(name: string): Promise<ClinicDentist> {
     throw new Error("Dentist name must be at least 2 characters.");
   }
 
-  const stored = await readStoredDentists();
-  const baseList = stored.length > 0 ? stored : await seedDefaultsIfEmpty();
-  const duplicate = baseList.find(
+  const dentists = await readStoredDentists();
+  const duplicate = dentists.find(
     (dentist) => dentist.name.toLowerCase() === trimmed.toLowerCase()
   );
   if (duplicate) {
@@ -123,12 +112,12 @@ export async function addDentist(name: string): Promise<ClinicDentist> {
   }
 
   const dentist: ClinicDentist = {
-    id: createUniqueId(trimmed, baseList),
+    id: createUniqueId(trimmed, dentists),
     name: trimmed,
     createdAt: new Date().toISOString(),
   };
 
-  await writeStoredDentists([...baseList, dentist]);
+  await writeStoredDentists([...dentists, dentist]);
   return dentist;
 }
 

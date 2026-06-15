@@ -10,7 +10,6 @@ import {
   clearLoginAttempts,
   getClientIp,
   isValidLoginEmail,
-  LOGIN_RATE_LIMIT_MESSAGE,
   recordFailedLoginAttempt,
   requiresEmailFormatLogin,
 } from "@/lib/admin-login-rate-limit";
@@ -19,8 +18,16 @@ export async function POST(request: Request) {
   try {
     const ip = getClientIp(request);
 
-    if (await checkLoginRateLimit(ip)) {
-      return NextResponse.json({ error: LOGIN_RATE_LIMIT_MESSAGE }, { status: 429 });
+    const rateLimit = await checkLoginRateLimit(ip);
+    if (rateLimit.limited) {
+      const response = NextResponse.json(
+        { error: rateLimit.message ?? LOGIN_GENERIC_ERROR },
+        { status: 429 }
+      );
+      if (rateLimit.retryAfterSeconds) {
+        response.headers.set("Retry-After", String(rateLimit.retryAfterSeconds));
+      }
+      return response;
     }
 
     const body = (await request.json()) as { email?: string; password?: string };

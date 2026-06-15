@@ -97,12 +97,7 @@ function StatusBadge({ status }: { status: DentistStatus }) {
       </span>
     );
   }
-  return (
-    <span className="admin-dentist-badge admin-dentist-badge-idle">
-      <span className="admin-dentist-badge-dot" aria-hidden />
-      Not invited
-    </span>
-  );
+  return null;
 }
 
 function CopyInviteLinkButton({ token, fullWidth = false }: { token: string; fullWidth?: boolean }) {
@@ -189,14 +184,12 @@ export function AdminDentistsClient({
   const stats = useMemo(() => {
     let active = 0;
     let pending = 0;
-    let needsInvite = 0;
     for (const dentist of dentists) {
       const status = getDentistStatus(dentist.id, accountByDentistId, inviteByDentistId);
       if (status === "active") active += 1;
       else if (status === "pending") pending += 1;
-      else needsInvite += 1;
     }
-    return { total: dentists.length, active, pending, needsInvite };
+    return { total: dentists.length, active, pending };
   }, [dentists, accountByDentistId, inviteByDentistId]);
 
   async function refreshDentists() {
@@ -391,12 +384,11 @@ export function AdminDentistsClient({
         description="Add clinic dentists, then invite each one to create their own dashboard login."
       />
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-3 gap-3">
         {[
           { label: "Total", value: stats.total },
           { label: "Active", value: stats.active },
           { label: "Pending", value: stats.pending },
-          { label: "Needs invite", value: stats.needsInvite },
         ].map((item) => (
           <div key={item.label} className="admin-dentist-stat">
             <p className="admin-dentist-stat-value">{item.value}</p>

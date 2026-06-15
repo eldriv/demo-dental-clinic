@@ -4,12 +4,6 @@ export interface ClinicDentist {
   createdAt: string;
 }
 
-/** Seeded into storage when no dentists exist yet. */
-export const DEFAULT_DENTISTS: Omit<ClinicDentist, "createdAt">[] = [
-  { id: "dr-chen", name: "Dr. Sarah Chen" },
-  { id: "dr-patel", name: "Dr. Raj Patel" },
-];
-
 export function slugifyDentistName(name: string): string {
   const slug = name
     .toLowerCase()

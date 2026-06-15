@@ -26,7 +26,7 @@ cp .env.example .env.local
 | `ADMIN_PASSWORD` | Owner dashboard password |
 | `ADMIN_PASSWORD_STAFF` | Front desk dashboard password |
 
-Admin login is rate-limited (5 failed attempts per 15 minutes per IP). In production, owner and staff must sign in with their **work email**, not short IDs like `owner` or `staff`.
+Admin login is rate-limited in production with escalating lockouts per IP: **1 min** after 3 failures, **2 min** after 5, **5 min** after 7, **1 hour** after 10 (within a rolling 1-hour window). In production, owner and staff must sign in with their **work email**, not short IDs like `owner` or `staff`.
 
 ## 2. Gmail SMTP Setup
 

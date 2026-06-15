@@ -1,4 +1,6 @@
 import { v4 as uuidv4 } from "uuid";
+import { purgeLegacyDemoData } from "@/lib/legacy-demo-data-purge";
+import { filterLegacySeedInvites } from "@/lib/legacy-demo-purge";
 import { getStore } from "@netlify/blobs";
 import { shouldUseNetlifyBlobs } from "@/lib/storage-env";
 
@@ -55,10 +57,14 @@ async function writeBlobInvites(invites: DentistInvite[]): Promise<void> {
 }
 
 async function readStoredInvites(): Promise<DentistInvite[]> {
+  await purgeLegacyDemoData();
+  let invites: DentistInvite[];
   if (shouldUseNetlifyBlobs()) {
-    return readBlobInvites();
+    invites = await readBlobInvites();
+  } else {
+    invites = await readLocalInvites();
   }
-  return readLocalInvites();
+  return filterLegacySeedInvites(invites);
 }
 
 async function writeStoredInvites(invites: DentistInvite[]): Promise<void> {

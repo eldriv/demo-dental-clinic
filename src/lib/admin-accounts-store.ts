@@ -1,7 +1,8 @@
 import { getStore } from "@netlify/blobs";
 import type { AdminRole } from "@/content/admin";
 import { hashAdminPassword, verifyAdminPassword } from "@/lib/admin-password";
-import { DEFAULT_DENTISTS } from "@/lib/dentists";
+import { purgeLegacyDemoData } from "@/lib/legacy-demo-data-purge";
+import { filterLegacySeedAdminAccounts } from "@/lib/legacy-demo-purge";
 import { shouldUseNetlifyBlobs } from "@/lib/storage-env";
 
 const BLOB_STORE = "bookings";
@@ -54,10 +55,14 @@ async function writeBlobAccounts(accounts: StoredAdminAccount[]): Promise<void> 
 }
 
 async function readStoredAccounts(): Promise<StoredAdminAccount[]> {
+  await purgeLegacyDemoData();
+  let accounts: StoredAdminAccount[];
   if (shouldUseNetlifyBlobs()) {
-    return readBlobAccounts();
+    accounts = await readBlobAccounts();
+  } else {
+    accounts = await readLocalAccounts();
   }
-  return readLocalAccounts();
+  return filterLegacySeedAdminAccounts(accounts);
 }
 
 async function writeStoredAccounts(accounts: StoredAdminAccount[]): Promise<void> {
@@ -66,11 +71,6 @@ async function writeStoredAccounts(accounts: StoredAdminAccount[]): Promise<void
   } else {
     await writeLocalAccounts(accounts);
   }
-}
-
-function envPasswordForAccountId(accountId: string): string | undefined {
-  const envKey = `ADMIN_PASSWORD_${accountId.toUpperCase().replace(/-/g, "_")}`;
-  return process.env[envKey];
 }
 
 function resolveOwnerEmail(isProduction: boolean): string | undefined {
@@ -259,28 +259,6 @@ async function buildBootstrapAccounts(): Promise<StoredAdminAccount[]> {
     });
   }
 
-  if (process.env.NODE_ENV !== "production") {
-    for (const dentist of DEFAULT_DENTISTS) {
-      const accountId = `dentist-${dentist.id}`;
-      const password =
-        envPasswordForAccountId(accountId) ??
-        envPasswordForAccountId(dentist.id) ??
-        "dentist2026";
-      const email = dentist.id;
-
-      accounts.push({
-        id: accountId,
-        email,
-        name: dentist.name,
-        role: "dentist",
-        linkedDentistId: dentist.id,
-        passwordHash: await hashAdminPassword(password),
-        createdAt: now,
-        status: "active",
-      });
-    }
-  }
-
   return accounts;
 }
 
@@ -300,40 +278,6 @@ export async function loadFreshAdminAccounts(): Promise<StoredAdminAccount[]> {
   return getAllAdminAccounts();
 }
 
-async function ensureDevDentistSeeds(
-  accounts: StoredAdminAccount[]
-): Promise<StoredAdminAccount[]> {
-  if (process.env.NODE_ENV === "production") return accounts;
-  if (accounts.some((account) => account.role === "dentist")) return accounts;
-
-  const now = new Date().toISOString();
-  const additions: StoredAdminAccount[] = [];
-
-  for (const dentist of DEFAULT_DENTISTS) {
-    const accountId = `dentist-${dentist.id}`;
-    const password =
-      envPasswordForAccountId(accountId) ??
-      envPasswordForAccountId(dentist.id) ??
-      "dentist2026";
-
-    additions.push({
-      id: accountId,
-      email: dentist.id,
-      name: dentist.name,
-      role: "dentist",
-      linkedDentistId: dentist.id,
-      passwordHash: await hashAdminPassword(password),
-      createdAt: now,
-      status: "active",
-    });
-  }
-
-  const next = [...accounts, ...additions];
-  await writeStoredAccounts(next);
-  accountsPromise = Promise.resolve(next);
-  return next;
-}
-
 export async function getAllAdminAccounts(): Promise<StoredAdminAccount[]> {
   if (!accountsPromise) {
     accountsPromise = (async () => {
@@ -341,7 +285,7 @@ export async function getAllAdminAccounts(): Promise<StoredAdminAccount[]> {
       if (stored.length > 0) {
         const migrated = await migrateLegacyAdminEmails(stored);
         const synced = await syncEnvManagedAccounts(migrated);
-        return ensureDevDentistSeeds(synced);
+        return synced;
       }
 
       const seeded = await buildBootstrapAccounts();
