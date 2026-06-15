@@ -133,7 +133,7 @@ function PatientTimelineVisit({ visit }: { visit: PatientTreatment }) {
           <p className="text-xs leading-relaxed text-slate-700">{visit.visitNotes}</p>
         </div>
       ) : visit.status === "completed" ? (
-        <p className="admin-patient-note-missing">No note recorded</p>
+        <p className="admin-patient-note-missing">No dentist note recorded</p>
       ) : null}
 
       {visit.internalNotes && (

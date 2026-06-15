@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ExternalLink,
+  FileText,
   Flag,
   Loader2,
   Mail,
@@ -187,6 +188,12 @@ export function AppointmentCard({ booking, onUpdated }: AppointmentCardProps) {
   }
 
   const chips = [
+    booking.visitNotes?.trim() && {
+      key: "vn",
+      tone: "blue" as const,
+      label: "Dentist note",
+      icon: FileText,
+    },
     booking.followUpNeeded && { key: "fu", tone: "amber" as const, label: "Follow-up", icon: Flag },
     booking.checkedInAt && { key: "in", tone: "green" as const, label: "Checked in", icon: UserCheck },
     showNoShowAlert && { key: "ns", tone: "amber" as const, label: "No-show risk", icon: AlertTriangle },
@@ -308,8 +315,20 @@ export function AppointmentCard({ booking, onUpdated }: AppointmentCardProps) {
 
           {booking.internalNotes && (
             <p className="text-xs text-amber-900 bg-amber-50 rounded-lg px-2 py-1.5">
-              Note: {booking.internalNotes}
+              Staff note: {booking.internalNotes}
             </p>
+          )}
+
+          {(booking.visitNotes?.trim() || booking.status === "completed") && (
+            <div className="admin-patient-note-block">
+              <p className="admin-patient-note-label">
+                <FileText className="size-3" />
+                Dentist note
+              </p>
+              <p className="text-xs leading-relaxed text-slate-700">
+                {booking.visitNotes?.trim() || "No treatment summary recorded yet."}
+              </p>
+            </div>
           )}
 
           {showNoShowAlert && (

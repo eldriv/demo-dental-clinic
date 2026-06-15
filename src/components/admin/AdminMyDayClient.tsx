@@ -62,6 +62,7 @@ function MyDayRow({
   loading,
   visitNotes,
   clinicStatus,
+  notesSaved,
   onVisitNotesChange,
   onAction,
 }: {
@@ -70,6 +71,7 @@ function MyDayRow({
   loading: string | null;
   visitNotes: string;
   clinicStatus?: PatientClinicStatus;
+  notesSaved?: boolean;
   onVisitNotesChange: (value: string) => void;
   onAction: (token: string, action: string, payload?: Record<string, unknown>) => void;
 }) {
@@ -81,6 +83,7 @@ function MyDayRow({
   const isDone = booking.status === "completed";
   const actionKey = (action: string) => booking.token + action;
   const isLoading = (action: string) => loading === actionKey(action);
+  const notesDirty = visitNotes !== (booking.visitNotes ?? "");
 
   return (
     <article
@@ -191,10 +194,10 @@ function MyDayRow({
             />
           </div>
 
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
             <button
               type="button"
-              disabled={!!loading}
+              disabled={!!loading || !notesDirty}
               onClick={() =>
                 onAction(booking.token, "update-visit-notes", { visitNotes })
               }
@@ -206,6 +209,9 @@ function MyDayRow({
                 "Save notes"
               )}
             </button>
+            {notesSaved && !notesDirty && (
+              <span className="text-xs font-medium text-green-700">Saved</span>
+            )}
             {!booking.followUpNeeded ? (
               <button
                 type="button"
@@ -264,6 +270,7 @@ export function AdminMyDayClient({
   const [bookings, setBookings] = useState(initialBookings);
   const [loading, setLoading] = useState<string | null>(null);
   const [visitNotes, setVisitNotes] = useState<Record<string, string>>({});
+  const [notesSavedToken, setNotesSavedToken] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<DayFilter>("all");
 
@@ -331,6 +338,16 @@ export function AdminMyDayClient({
         return;
       }
       setBookings((current) => current.map((b) => (b.token === token ? data.booking : b)));
+      if (action === "update-visit-notes" && data.booking) {
+        setVisitNotes((current) => ({
+          ...current,
+          [token]: data.booking.visitNotes ?? "",
+        }));
+        setNotesSavedToken(token);
+        window.setTimeout(() => {
+          setNotesSavedToken((current) => (current === token ? null : current));
+        }, 2500);
+      }
     } catch {
       setError("Action failed.");
     } finally {
@@ -430,6 +447,7 @@ export function AdminMyDayClient({
                   }
                   loading={loading}
                   visitNotes={visitNotes[booking.token] ?? booking.visitNotes ?? ""}
+                  notesSaved={notesSavedToken === booking.token}
                   onVisitNotesChange={(value) =>
                     setVisitNotes((current) => ({ ...current, [booking.token]: value }))
                   }
