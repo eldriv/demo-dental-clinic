@@ -210,6 +210,19 @@ async function buildBootstrapAccounts(): Promise<StoredAdminAccount[]> {
 
 let accountsPromise: Promise<StoredAdminAccount[]> | null = null;
 
+function invalidateAdminAccountsCache(): void {
+  accountsPromise = null;
+}
+
+/** Always read storage for auth — avoids stale serverless module cache after invite signup. */
+export async function loadFreshAdminAccounts(): Promise<StoredAdminAccount[]> {
+  const stored = await readStoredAccounts();
+  if (stored.length > 0) {
+    return migrateLegacyAdminEmails(stored);
+  }
+  return getAllAdminAccounts();
+}
+
 async function ensureDevDentistSeeds(
   accounts: StoredAdminAccount[]
 ): Promise<StoredAdminAccount[]> {
@@ -273,6 +286,7 @@ export async function saveAdminAccount(account: StoredAdminAccount): Promise<voi
       : accounts.map((entry) => (entry.id === account.id ? account : entry));
 
   await writeStoredAccounts(next);
+  invalidateAdminAccountsCache();
   accountsPromise = Promise.resolve(next);
 }
 
@@ -280,21 +294,21 @@ export async function findAdminAccountByEmail(
   email: string
 ): Promise<StoredAdminAccount | undefined> {
   const normalized = email.trim().toLowerCase();
-  const accounts = await getAllAdminAccounts();
+  const accounts = await loadFreshAdminAccounts();
   return accounts.find((account) => account.email.toLowerCase() === normalized);
 }
 
 export async function findAdminAccountById(
   id: string
 ): Promise<StoredAdminAccount | undefined> {
-  const accounts = await getAllAdminAccounts();
+  const accounts = await loadFreshAdminAccounts();
   return accounts.find((account) => account.id === id);
 }
 
 export async function findAdminAccountByLinkedDentistId(
   linkedDentistId: string
 ): Promise<StoredAdminAccount | undefined> {
-  const accounts = await getAllAdminAccounts();
+  const accounts = await loadFreshAdminAccounts();
   return accounts.find(
     (account) =>
       account.role === "dentist" &&

@@ -703,3 +703,167 @@ body {
     transform: scale(1.02);
   }
 }
+
+.admin-dentist-stat {
+  @apply rounded-2xl border border-white/80 bg-white/90 px-4 py-3.5 shadow-[0_4px_24px_rgba(26,60,52,0.04)] ring-1 ring-gray-100/90 backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_28px_rgba(26,60,52,0.08)];
+}
+
+.admin-dentist-stat-value {
+  @apply text-2xl font-bold tabular-nums tracking-tight text-dark;
+}
+
+.admin-dentist-stat-label {
+  @apply mt-0.5 text-[11px] font-semibold uppercase tracking-wider text-muted;
+}
+
+.admin-dentist-add-card {
+  @apply p-4! sm:p-5!;
+}
+
+.admin-dentist-icon-wrap {
+  @apply flex size-12 shrink-0 items-center justify-center rounded-2xl bg-linear-to-br from-primary/15 to-primary/5 text-primary shadow-sm ring-1 ring-primary/10;
+}
+
+.admin-dentist-grid {
+  @apply grid gap-4 sm:gap-5 lg:grid-cols-2;
+}
+
+.admin-dentist-card {
+  @apply flex flex-col gap-4 rounded-2xl border border-gray-100/90 bg-white p-4 shadow-[0_4px_24px_rgba(26,60,52,0.05)] ring-1 ring-gray-100/80 transition-all duration-200 hover:border-primary/10 hover:shadow-[0_12px_40px_rgba(26,60,52,0.08)] sm:p-5;
+}
+
+.admin-dentist-card-head {
+  @apply flex items-start justify-between gap-3;
+}
+
+.admin-dentist-avatar {
+  @apply flex size-12 shrink-0 items-center justify-center rounded-2xl text-sm font-bold text-white shadow-[0_4px_14px_rgba(26,60,52,0.2)];
+}
+
+.admin-dentist-badge {
+  @apply mt-1.5 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium;
+}
+
+.admin-dentist-badge-active {
+  @apply bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100;
+}
+
+.admin-dentist-badge-pending {
+  @apply bg-amber-50 text-amber-800 ring-1 ring-amber-100;
+}
+
+.admin-dentist-badge-idle {
+  @apply bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100/90;
+}
+
+.admin-dentist-badge-dot {
+  @apply size-1.5 rounded-full bg-current opacity-70;
+}
+
+.admin-dentist-delete {
+  @apply rounded-xl p-2 text-slate-400 opacity-0 transition-all duration-200 hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 focus:opacity-100;
+}
+
+.admin-dentist-panel {
+  @apply rounded-xl border p-4;
+}
+
+.admin-dentist-panel-active {
+  @apply flex items-center gap-3 border-emerald-100/80 bg-linear-to-r from-emerald-50/80 to-white;
+}
+
+.admin-dentist-panel-pending {
+  @apply space-y-3 border-amber-100/80 bg-linear-to-br from-amber-50/40 via-white to-white;
+}
+
+.admin-dentist-panel-idle {
+  @apply space-y-3.5 border-indigo-100/70 bg-linear-to-br from-indigo-50/30 via-white to-violet-50/20;
+}
+
+.admin-dentist-panel-icon-idle {
+  @apply bg-indigo-100 text-indigo-700;
+}
+
+.admin-dentist-idle-head {
+  @apply flex items-start gap-3;
+}
+
+.admin-dentist-invite-compose {
+  @apply flex items-center gap-1 rounded-2xl bg-white p-1.5 shadow-[inset_0_0_0_1px_rgba(99,102,241,0.12),0_2px_8px_rgba(26,60,52,0.04)] transition-shadow focus-within:shadow-[inset_0_0_0_1px_rgba(99,102,241,0.35),0_4px_16px_rgba(99,102,241,0.08)];
+}
+
+.admin-dentist-invite-icon {
+  @apply ml-2.5 size-4 shrink-0 text-indigo-400;
+}
+
+.admin-dentist-invite-input {
+  @apply min-w-0 flex-1 border-0 bg-transparent px-2 py-2 text-sm text-dark placeholder:text-slate-400 focus:outline-none;
+}
+
+.admin-dentist-invite-send {
+  @apply inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-linear-to-r from-primary to-primary/90 px-4 py-2 text-sm font-semibold text-white shadow-[0_2px_10px_rgba(45,106,79,0.2)] transition-all duration-200 hover:shadow-[0_4px_14px_rgba(45,106,79,0.28)] active:scale-[0.98] disabled:opacity-60;
+}
+
+.admin-dentist-panel-icon {
+  @apply flex size-9 shrink-0 items-center justify-center rounded-xl;
+}
+
+.admin-dentist-panel-icon-active {
+  @apply bg-emerald-100 text-emerald-700;
+}
+
+.admin-dentist-panel-icon-pending {
+  @apply bg-amber-100 text-amber-700;
+}
+
+.admin-dentist-pending-head {
+  @apply flex items-start gap-3;
+}
+
+.admin-dentist-email-chip {
+  @apply inline-flex max-w-full items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-medium text-dark ring-1 ring-gray-200/80;
+}
+
+.admin-dentist-hint {
+  @apply text-xs leading-relaxed text-muted;
+}
+
+.admin-dentist-actions {
+  @apply flex flex-col items-stretch gap-2 pt-1;
+}
+
+.admin-dentist-copy-btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-[0_4px_14px_rgba(45,106,79,0.22)] transition-all duration-200 hover:bg-primary/90 hover:shadow-[0_6px_18px_rgba(45,106,79,0.28)] active:scale-[0.98];
+}
+
+.admin-dentist-copy-btn-full {
+  @apply w-full;
+}
+
+.admin-dentist-copy-btn-done {
+  @apply bg-emerald-600 shadow-[0_4px_14px_rgba(5,150,105,0.25)];
+}
+
+.admin-dentist-revoke-link {
+  @apply inline-flex items-center justify-center gap-1.5 py-1 text-xs font-medium text-slate-500 transition-colors hover:text-red-600 disabled:opacity-50;
+}
+
+.admin-dentist-alert {
+  @apply flex items-start gap-2.5 rounded-xl border px-3.5 py-3 text-sm;
+}
+
+.admin-dentist-alert p {
+  @apply leading-relaxed;
+}
+
+.admin-dentist-alert-error {
+  @apply border-red-100 bg-red-50/90 text-red-700;
+}
+
+.admin-dentist-alert-success {
+  @apply border-emerald-100 bg-emerald-50/90 text-emerald-800;
+}
+
+.admin-dentist-alert-info {
+  @apply border-blue-100 bg-blue-50/90 text-blue-800;
+}

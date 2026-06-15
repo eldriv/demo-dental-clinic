@@ -14,7 +14,7 @@ import {
   findAdminAccountByLinkedDentistId,
   findAdminAccountByEmail as findStoredAccountByEmail,
 } from "@/lib/admin-accounts-store";
-import { getDentistById } from "@/lib/dentists-store";
+import { findDentistByIdWithRetry } from "@/lib/dentists-store";
 import { sendDentistInviteEmail } from "@/lib/email";
 import { validateNewPassword } from "@/lib/admin-password";
 
@@ -31,9 +31,16 @@ export async function issueDentistInvite(input: {
     return { error: "Please enter a valid email address." };
   }
 
-  const dentist = await getDentistById(dentistId);
+  if (!dentistId) {
+    return { error: "Missing dentist profile. Refresh the page and try again." };
+  }
+
+  const dentist = await findDentistByIdWithRetry(dentistId);
   if (!dentist) {
-    return { error: "Dentist not found." };
+    return {
+      error:
+        "Dentist profile not found yet. Wait a moment, refresh the page, then send the invite again.",
+    };
   }
 
   const existingAccount = await findAdminAccountByLinkedDentistId(dentistId);

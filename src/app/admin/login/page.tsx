@@ -1,12 +1,11 @@
 "use client";
 
 import { Suspense, useState, type FormEvent } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Loader2, ShieldCheck, Stethoscope } from "lucide-react";
 import { site } from "@/content";
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const created = searchParams.get("created") === "1";
   const isDev = process.env.NODE_ENV === "development";
@@ -35,8 +34,7 @@ function LoginForm() {
       const next =
         searchParams.get("next") ||
         (data.user?.role === "dentist" ? "/admin/my-day" : "/admin");
-      router.push(next);
-      router.refresh();
+      window.location.assign(next);
     } catch {
       setError("Login failed.");
     } finally {

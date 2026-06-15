@@ -1,7 +1,19 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
-import { Check, Copy, Loader2, Mail, Trash2, UserPlus, XCircle } from "lucide-react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  AlertCircle,
+  Check,
+  CheckCircle2,
+  Clock3,
+  Copy,
+  Loader2,
+  Mail,
+  Stethoscope,
+  Trash2,
+  UserPlus,
+  XCircle,
+} from "lucide-react";
 import { AdminEmptyState, AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import type { ClinicDentist } from "@/lib/dentists";
 import type { DentistInvite } from "@/lib/admin-invites-store";
@@ -18,6 +30,8 @@ interface AdminDentistsClientProps {
   initialAccounts: DentistAccountSummary[];
 }
 
+type DentistStatus = "needs-invite" | "pending" | "active";
+
 function formatInviteExpiry(expiresAt: string): string {
   return new Date(expiresAt).toLocaleDateString("en-PH", {
     month: "short",
@@ -31,7 +45,67 @@ function buildAcceptInviteUrl(token: string): string {
   return `${window.location.origin}/admin/accept-invite?token=${encodeURIComponent(token)}`;
 }
 
-function CopyInviteLinkButton({ token }: { token: string }) {
+function getInitials(name: string): string {
+  return name
+    .replace(/^dr\.?\s+/i, "")
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+const AVATAR_PALETTES = [
+  "from-teal-600 to-emerald-700",
+  "from-violet-600 to-indigo-700",
+  "from-sky-600 to-blue-700",
+  "from-rose-600 to-pink-700",
+  "from-amber-600 to-orange-700",
+] as const;
+
+function getAvatarPalette(id: string): (typeof AVATAR_PALETTES)[number] {
+  let hash = 0;
+  for (let i = 0; i < id.length; i += 1) {
+    hash = (hash + id.charCodeAt(i) * (i + 1)) % AVATAR_PALETTES.length;
+  }
+  return AVATAR_PALETTES[hash] ?? AVATAR_PALETTES[0];
+}
+
+function getDentistStatus(
+  dentistId: string,
+  accountByDentistId: Record<string, DentistAccountSummary>,
+  inviteByDentistId: Record<string, DentistInvite>
+): DentistStatus {
+  if (accountByDentistId[dentistId]) return "active";
+  if (inviteByDentistId[dentistId]) return "pending";
+  return "needs-invite";
+}
+
+function StatusBadge({ status }: { status: DentistStatus }) {
+  if (status === "active") {
+    return (
+      <span className="admin-dentist-badge admin-dentist-badge-active">
+        <CheckCircle2 className="size-3.5" />
+        Active
+      </span>
+    );
+  }
+  if (status === "pending") {
+    return (
+      <span className="admin-dentist-badge admin-dentist-badge-pending">
+        <Clock3 className="size-3.5" />
+        Invite sent
+      </span>
+    );
+  }
+  return (
+    <span className="admin-dentist-badge admin-dentist-badge-idle">
+      <span className="admin-dentist-badge-dot" aria-hidden />
+      Not invited
+    </span>
+  );
+}
+
+function CopyInviteLinkButton({ token, fullWidth = false }: { token: string; fullWidth?: boolean }) {
   const [copied, setCopied] = useState(false);
   const url = buildAcceptInviteUrl(token);
 
@@ -49,11 +123,37 @@ function CopyInviteLinkButton({ token }: { token: string }) {
     <button
       type="button"
       onClick={copyLink}
-      className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100"
+      className={`admin-dentist-copy-btn ${fullWidth ? "admin-dentist-copy-btn-full" : ""} ${copied ? "admin-dentist-copy-btn-done" : ""}`}
     >
-      {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-      {copied ? "Copied" : "Copy invite link"}
+      {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+      {copied ? "Link copied" : "Copy invite link"}
     </button>
+  );
+}
+
+function AlertBanner({
+  tone,
+  message,
+}: {
+  tone: "error" | "success" | "info";
+  message: string;
+}) {
+  const toneClass =
+    tone === "error"
+      ? "admin-dentist-alert-error"
+      : tone === "success"
+        ? "admin-dentist-alert-success"
+        : "admin-dentist-alert-info";
+
+  return (
+    <div className={`admin-dentist-alert ${toneClass}`} role="status">
+      {tone === "error" ? (
+        <AlertCircle className="size-4 shrink-0" />
+      ) : (
+        <CheckCircle2 className="size-4 shrink-0" />
+      )}
+      <p>{message}</p>
+    </div>
   );
 }
 
@@ -69,8 +169,10 @@ export function AdminDentistsClient({
   const [inviteEmails, setInviteEmails] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [inviteLoading, setInviteLoading] = useState<string | null>(null);
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
+  const [formError, setFormError] = useState("");
+  const [formMessage, setFormMessage] = useState("");
+  const [inviteErrors, setInviteErrors] = useState<Record<string, string>>({});
+  const [inviteMessages, setInviteMessages] = useState<Record<string, string>>({});
 
   const accountByDentistId = useMemo(() => {
     return Object.fromEntries(
@@ -84,11 +186,56 @@ export function AdminDentistsClient({
     return Object.fromEntries(invites.map((invite) => [invite.linkedDentistId, invite]));
   }, [invites]);
 
+  const stats = useMemo(() => {
+    let active = 0;
+    let pending = 0;
+    let needsInvite = 0;
+    for (const dentist of dentists) {
+      const status = getDentistStatus(dentist.id, accountByDentistId, inviteByDentistId);
+      if (status === "active") active += 1;
+      else if (status === "pending") pending += 1;
+      else needsInvite += 1;
+    }
+    return { total: dentists.length, active, pending, needsInvite };
+  }, [dentists, accountByDentistId, inviteByDentistId]);
+
+  async function refreshDentists() {
+    const res = await fetch("/api/admin/dentists");
+    if (!res.ok) return;
+    const data = await res.json();
+    if (Array.isArray(data.dentists)) {
+      setDentists(data.dentists);
+    }
+  }
+
+  async function refreshInviteState() {
+    const res = await fetch("/api/admin/invites");
+    if (!res.ok) return;
+    const data = await res.json();
+    if (Array.isArray(data.invites)) {
+      setInvites(data.invites);
+    }
+    if (Array.isArray(data.dentistAccounts)) {
+      setAccounts(data.dentistAccounts);
+    }
+  }
+
+  useEffect(() => {
+    void refreshInviteState();
+
+    function onFocus() {
+      void refreshInviteState();
+    }
+
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setLoading(true);
-    setError("");
-    setMessage("");
+    setFormError("");
+    setFormMessage("");
 
     try {
       const res = await fetch("/api/admin/dentists", {
@@ -98,59 +245,86 @@ export function AdminDentistsClient({
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Failed to add dentist.");
+        setFormError(data.error ?? "Failed to add dentist.");
         return;
       }
 
-      setDentists((current) => [...current, data.dentist]);
+      await refreshDentists();
       setName("");
-      setMessage(
-        `${data.dentist.name} added. Send an invite email so they can create their own login.`
-      );
+      setFormMessage(`${data.dentist.name} added. Send an invite below so they can create their login.`);
     } catch {
-      setError("Failed to add dentist.");
+      setFormError("Failed to add dentist.");
     } finally {
       setLoading(false);
     }
   }
 
   async function handleDelete(id: string) {
-    setError("");
-    setMessage("");
+    setFormError("");
+    setFormMessage("");
+    setInviteErrors((current) => {
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
 
     const res = await fetch(`/api/admin/dentists?id=${id}`, { method: "DELETE" });
     const data = await res.json();
     if (!res.ok) {
-      setError(data.error ?? "Failed to remove dentist.");
+      setInviteErrors((current) => ({
+        ...current,
+        [id]: data.error ?? "Failed to remove dentist.",
+      }));
       return;
     }
 
     setDentists((current) => current.filter((dentist) => dentist.id !== id));
     setInvites((current) => current.filter((invite) => invite.linkedDentistId !== id));
     setAccounts((current) => current.filter((account) => account.linkedDentistId !== id));
-    setMessage("Dentist removed.");
+    setFormMessage("Dentist removed.");
   }
 
-  async function sendInvite(dentist: ClinicDentist) {
+  async function sendInvite(dentist: ClinicDentist, retry = false) {
     const email = inviteEmails[dentist.id]?.trim();
     if (!email) {
-      setError(`Enter an email address for ${dentist.name}.`);
+      setInviteErrors((current) => ({
+        ...current,
+        [dentist.id]: `Enter an email address for ${dentist.name}.`,
+      }));
       return;
     }
 
     setInviteLoading(dentist.id);
-    setError("");
-    setMessage("");
+    setInviteErrors((current) => ({ ...current, [dentist.id]: "" }));
+    setInviteMessages((current) => ({ ...current, [dentist.id]: "" }));
 
     try {
+      if (!retry) {
+        await refreshDentists();
+      }
+
       const res = await fetch("/api/admin/invites", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ linkedDentistId: dentist.id, email }),
       });
       const data = await res.json();
+
+      if (
+        !res.ok &&
+        !data.invite &&
+        !retry &&
+        `${data.error ?? data.warning ?? ""}`.toLowerCase().includes("not found")
+      ) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        return sendInvite(dentist, true);
+      }
+
       if (!res.ok && !data.invite) {
-        setError(data.error ?? data.warning ?? "Failed to send invite.");
+        setInviteErrors((current) => ({
+          ...current,
+          [dentist.id]: data.error ?? data.warning ?? "Failed to send invite.",
+        }));
         return;
       }
 
@@ -161,22 +335,26 @@ export function AdminDentistsClient({
         ]);
       }
 
-      setMessage(
-        data.warning
-          ? `${data.warning} You can copy the invite link below and send it directly.`
-          : `Invite ready for ${email}. Email sent if SMTP is configured — you can also copy the link below immediately.`
-      );
+      setInviteMessages((current) => ({
+        ...current,
+        [dentist.id]: data.warning
+          ? `${data.warning} Copy the link below and send it directly.`
+          : `Invite ready for ${email}. Email sent if configured — you can also copy the link below.`,
+      }));
     } catch {
-      setError("Failed to send invite.");
+      setInviteErrors((current) => ({
+        ...current,
+        [dentist.id]: "Failed to send invite.",
+      }));
     } finally {
       setInviteLoading(null);
     }
   }
 
-  async function revokeInvite(token: string) {
+  async function revokeInvite(token: string, dentistId: string) {
     setInviteLoading(token);
-    setError("");
-    setMessage("");
+    setInviteErrors((current) => ({ ...current, [dentistId]: "" }));
+    setInviteMessages((current) => ({ ...current, [dentistId]: "" }));
 
     try {
       const res = await fetch(`/api/admin/invites?token=${encodeURIComponent(token)}`, {
@@ -184,77 +362,126 @@ export function AdminDentistsClient({
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Failed to revoke invite.");
+        setInviteErrors((current) => ({
+          ...current,
+          [dentistId]: data.error ?? "Failed to revoke invite.",
+        }));
         return;
       }
 
       setInvites((current) => current.filter((invite) => invite.token !== token));
-      setMessage("Invite revoked.");
+      setInviteMessages((current) => ({
+        ...current,
+        [dentistId]: "Invite revoked. You can send a new one anytime.",
+      }));
     } catch {
-      setError("Failed to revoke invite.");
+      setInviteErrors((current) => ({
+        ...current,
+        [dentistId]: "Failed to revoke invite.",
+      }));
     } finally {
       setInviteLoading(null);
     }
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       <AdminPageHeader
         title="Dentists"
-        description="Add dentists to the clinic, then invite each one to create their own dashboard login."
+        description="Add clinic dentists, then invite each one to create their own dashboard login."
       />
 
-      <form onSubmit={handleSubmit} className="admin-card space-y-4">
-        <h2 className="font-semibold text-dark">Add dentist profile</h2>
-        <p className="text-sm text-muted">
-          This adds them to online booking and scheduling. After saving, send an invite so they can
-          set up their own password.
-        </p>
-        <div>
-          <label htmlFor="dentist-name" className="mb-1.5 block text-sm font-medium text-gray-700">
-            Full name
-          </label>
-          <input
-            id="dentist-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="input-field"
-            placeholder="Dr. Juan Reyes"
-            required
-            minLength={2}
-          />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[
+          { label: "Total", value: stats.total },
+          { label: "Active", value: stats.active },
+          { label: "Pending", value: stats.pending },
+          { label: "Needs invite", value: stats.needsInvite },
+        ].map((item) => (
+          <div key={item.label} className="admin-dentist-stat">
+            <p className="admin-dentist-stat-value">{item.value}</p>
+            <p className="admin-dentist-stat-label">{item.label}</p>
+          </div>
+        ))}
+      </div>
+
+      <form onSubmit={handleSubmit} className="admin-card admin-dentist-add-card">
+        <div className="flex items-start gap-3">
+          <div className="admin-dentist-icon-wrap">
+            <UserPlus className="size-5" />
+          </div>
+          <div className="min-w-0 flex-1 space-y-4">
+            <div>
+              <h2 className="font-semibold text-dark">Add dentist profile</h2>
+              <p className="mt-1 text-sm text-muted">
+                Adds them to online booking and scheduling. Then send an invite so they can set their
+                password.
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="dentist-name" className="mb-1.5 block text-sm font-medium text-gray-700">
+                Full name
+              </label>
+              <input
+                id="dentist-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="input-field"
+                placeholder="Dr. Juan Reyes"
+                required
+                minLength={2}
+              />
+            </div>
+
+            {formError && <AlertBanner tone="error" message={formError} />}
+            {formMessage && <AlertBanner tone="success" message={formMessage} />}
+
+            <button type="submit" disabled={loading} className="btn-cta w-full sm:w-auto">
+              {loading ? <Loader2 className="size-4 animate-spin" /> : <UserPlus className="size-4" />}
+              Add dentist
+            </button>
+          </div>
         </div>
-
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        {message && <p className="text-sm text-primary">{message}</p>}
-
-        <button type="submit" disabled={loading} className="btn-cta">
-          {loading ? <Loader2 className="size-4 animate-spin" /> : <UserPlus className="size-4" />}
-          Add dentist
-        </button>
       </form>
 
       <section className="space-y-3">
-        <h2 className="font-semibold text-dark">Clinic dentists ({dentists.length})</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="admin-section-title">Clinic dentists</h2>
+          <span className="text-sm text-muted">{stats.total} total</span>
+        </div>
+
         {dentists.length === 0 ? (
           <AdminEmptyState message="No dentists yet. Add your clinic dentists above." />
         ) : (
-          <div className="grid gap-3">
+          <div className="admin-dentist-grid">
             {dentists.map((dentist) => {
               const account = accountByDentistId[dentist.id];
               const invite = inviteByDentistId[dentist.id];
+              const status = getDentistStatus(dentist.id, accountByDentistId, inviteByDentistId);
+              const cardError = inviteErrors[dentist.id];
+              const cardMessage = inviteMessages[dentist.id];
 
               return (
-                <div key={dentist.id} className="admin-card space-y-4 p-4!">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-medium text-dark">{dentist.name}</p>
-                      <p className="text-xs text-muted">Profile ID: {dentist.id}</p>
+                <article key={dentist.id} className="admin-dentist-card group">
+                  <div className="admin-dentist-card-head">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div
+                        className={`admin-dentist-avatar bg-linear-to-br ${getAvatarPalette(dentist.id)}`}
+                      >
+                        {getInitials(dentist.name)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-base font-semibold tracking-tight text-dark">
+                          {dentist.name}
+                        </p>
+                        <StatusBadge status={status} />
+                      </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => handleDelete(dentist.id)}
-                      className="rounded-lg p-2 text-red-600 hover:bg-red-50"
+                      className="admin-dentist-delete"
                       aria-label={`Remove ${dentist.name}`}
                     >
                       <Trash2 className="size-4" />
@@ -262,43 +489,76 @@ export function AdminDentistsClient({
                   </div>
 
                   {account ? (
-                    <div className="rounded-xl border border-primary/15 bg-primary/5 px-3 py-2 text-sm">
-                      <p className="font-medium text-primary">Account active</p>
-                      <p className="text-muted">{account.email}</p>
+                    <div className="admin-dentist-panel admin-dentist-panel-active">
+                      <div className="admin-dentist-panel-icon admin-dentist-panel-icon-active">
+                        <Stethoscope className="size-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-dark">Dashboard access active</p>
+                        <p className="mt-0.5 truncate text-sm text-muted">{account.email}</p>
+                      </div>
                     </div>
                   ) : invite ? (
-                    <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm">
-                      <div>
-                        <p className="font-medium text-amber-900">Invite pending</p>
-                        <p className="text-amber-800">
-                          {invite.email} · expires {formatInviteExpiry(invite.expiresAt)}
-                        </p>
-                        <p className="mt-1 text-xs text-amber-800/80">
-                          Share the link right away — email delivery can take a few minutes.
-                        </p>
+                    <div className="admin-dentist-panel admin-dentist-panel-pending">
+                      <div className="admin-dentist-pending-head">
+                        <div className="admin-dentist-panel-icon admin-dentist-panel-icon-pending">
+                          <Clock3 className="size-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-dark">Waiting for setup</p>
+                          <p className="mt-0.5 text-sm text-muted">
+                            Expires {formatInviteExpiry(invite.expiresAt)}
+                          </p>
+                        </div>
                       </div>
-                      <CopyInviteLinkButton token={invite.token} />
-                      <button
-                        type="button"
-                        onClick={() => revokeInvite(invite.token)}
-                        disabled={inviteLoading === invite.token}
-                        className="inline-flex items-center gap-2 text-xs font-medium text-amber-900 hover:underline"
-                      >
-                        {inviteLoading === invite.token ? (
-                          <Loader2 className="size-3.5 animate-spin" />
-                        ) : (
-                          <XCircle className="size-3.5" />
-                        )}
-                        Revoke invite
-                      </button>
+
+                      <div className="admin-dentist-email-chip">
+                        <Mail className="size-3.5 shrink-0 text-primary/70" />
+                        <span className="truncate">{invite.email}</span>
+                      </div>
+
+                      <p className="admin-dentist-hint">
+                        Share the link now — email delivery can take a few minutes.
+                      </p>
+
+                      <div className="admin-dentist-actions">
+                        <CopyInviteLinkButton token={invite.token} fullWidth />
+                        <button
+                          type="button"
+                          onClick={() => revokeInvite(invite.token, dentist.id)}
+                          disabled={inviteLoading === invite.token}
+                          className="admin-dentist-revoke-link"
+                        >
+                          {inviteLoading === invite.token ? (
+                            <Loader2 className="size-3.5 animate-spin" />
+                          ) : (
+                            <XCircle className="size-3.5" />
+                          )}
+                          Revoke invite
+                        </button>
+                      </div>
                     </div>
                   ) : (
-                    <div className="space-y-3">
-                      <p className="text-sm text-muted">
-                        No login yet. Send an invite so this dentist can create their own password.
-                      </p>
-                      <div className="flex flex-col gap-2 sm:flex-row">
+                    <div className="admin-dentist-panel admin-dentist-panel-idle">
+                      <div className="admin-dentist-idle-head">
+                        <div className="admin-dentist-panel-icon admin-dentist-panel-icon-idle">
+                          <UserPlus className="size-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-dark">Invite to dashboard</p>
+                          <p className="mt-0.5 text-xs text-muted">
+                            They&apos;ll choose a password and unlock My Day, Patients &amp; Calendar.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="admin-dentist-invite-compose">
+                        <label className="sr-only" htmlFor={`invite-email-${dentist.id}`}>
+                          Email for {dentist.name}
+                        </label>
+                        <Mail className="admin-dentist-invite-icon" aria-hidden />
                         <input
+                          id={`invite-email-${dentist.id}`}
                           type="email"
                           value={inviteEmails[dentist.id] ?? ""}
                           onChange={(e) =>
@@ -307,27 +567,42 @@ export function AdminDentistsClient({
                               [dentist.id]: e.target.value,
                             }))
                           }
-                          className="input-field flex-1"
-                          placeholder="dentist@clinic.ph"
-                          aria-label={`Invite email for ${dentist.name}`}
+                          className="admin-dentist-invite-input"
+                          placeholder="name@email.com"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              sendInvite(dentist);
+                            }
+                          }}
                         />
                         <button
                           type="button"
                           onClick={() => sendInvite(dentist)}
                           disabled={inviteLoading === dentist.id}
-                          className="btn-cta shrink-0"
+                          className="admin-dentist-invite-send"
                         >
                           {inviteLoading === dentist.id ? (
                             <Loader2 className="size-4 animate-spin" />
                           ) : (
-                            <Mail className="size-4" />
+                            <>
+                              Send
+                              <Mail className="size-3.5 opacity-80" />
+                            </>
                           )}
-                          Send invite
                         </button>
                       </div>
                     </div>
                   )}
-                </div>
+
+                  {cardError && <AlertBanner tone="error" message={cardError} />}
+                  {cardMessage && (
+                    <AlertBanner
+                      tone={cardMessage.includes("revoked") ? "info" : "success"}
+                      message={cardMessage}
+                    />
+                  )}
+                </article>
               );
             })}
           </div>

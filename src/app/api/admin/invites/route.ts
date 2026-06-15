@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isSessionGuard, requireOwnerSessionFromRequest } from "@/lib/admin-guard";
 import { getPendingDentistInvites } from "@/lib/admin-invites-store";
-import { getAllAdminAccounts } from "@/lib/admin-accounts-store";
+import { loadFreshAdminAccounts } from "@/lib/admin-accounts-store";
 import { cancelDentistInvite, issueDentistInvite } from "@/lib/admin-dentist-invites";
 import { getSiteUrlFromRequest } from "@/lib/site-url";
 
@@ -11,7 +11,7 @@ export async function GET(request: Request) {
 
   const [invites, accounts] = await Promise.all([
     getPendingDentistInvites(),
-    getAllAdminAccounts(),
+    loadFreshAdminAccounts(),
   ]);
 
   const dentistAccounts = accounts

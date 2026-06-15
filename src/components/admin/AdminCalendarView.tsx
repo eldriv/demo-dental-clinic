@@ -34,6 +34,7 @@ interface AdminCalendarViewProps {
   initialBlocks: ScheduleBlock[];
   timeSlots: string[];
   dentists: ClinicDentist[];
+  defaultDentistId?: string;
 }
 
 const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -43,12 +44,17 @@ export function AdminCalendarView({
   initialBlocks,
   timeSlots,
   dentists,
+  defaultDentistId,
 }: AdminCalendarViewProps) {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [selectedDate, setSelectedDate] = useState(toDateString(today));
-  const [selectedDentistId, setSelectedDentistId] = useState(dentists[0]?.id ?? "");
+  const initialDentistId =
+    defaultDentistId && dentists.some((d) => d.id === defaultDentistId)
+      ? defaultDentistId
+      : (dentists[0]?.id ?? "");
+  const [selectedDentistId, setSelectedDentistId] = useState(initialDentistId);
 
   const todayString = toDateString(today);
   const selectedDentist = dentists.find((dentist) => dentist.id === selectedDentistId);

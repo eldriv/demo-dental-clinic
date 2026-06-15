@@ -76,6 +76,26 @@ export async function getAllDentists(): Promise<ClinicDentist[]> {
   return seedDefaultsIfEmpty();
 }
 
+export async function findDentistByIdWithRetry(
+  id: string,
+  attempts = 3
+): Promise<ClinicDentist | undefined> {
+  const dentistId = id.trim();
+  if (!dentistId) return undefined;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const dentists = await readStoredDentists();
+    const list = dentists.length > 0 ? dentists : await seedDefaultsIfEmpty();
+    const match = list.find((dentist) => dentist.id === dentistId);
+    if (match) return match;
+    if (attempt < attempts - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 120));
+    }
+  }
+
+  return undefined;
+}
+
 function createUniqueId(name: string, dentists: ClinicDentist[]): string {
   const base = slugifyDentistName(name);
   if (!dentists.some((dentist) => dentist.id === base)) return base;
@@ -93,8 +113,9 @@ export async function addDentist(name: string): Promise<ClinicDentist> {
     throw new Error("Dentist name must be at least 2 characters.");
   }
 
-  const dentists = await getAllDentists();
-  const duplicate = dentists.find(
+  const stored = await readStoredDentists();
+  const baseList = stored.length > 0 ? stored : await seedDefaultsIfEmpty();
+  const duplicate = baseList.find(
     (dentist) => dentist.name.toLowerCase() === trimmed.toLowerCase()
   );
   if (duplicate) {
@@ -102,12 +123,12 @@ export async function addDentist(name: string): Promise<ClinicDentist> {
   }
 
   const dentist: ClinicDentist = {
-    id: createUniqueId(trimmed, dentists),
+    id: createUniqueId(trimmed, baseList),
     name: trimmed,
     createdAt: new Date().toISOString(),
   };
 
-  await writeStoredDentists([...dentists, dentist]);
+  await writeStoredDentists([...baseList, dentist]);
   return dentist;
 }
 
