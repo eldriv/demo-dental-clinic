@@ -5,6 +5,7 @@ import {
   cancelBookingAdmin,
   completeBooking,
   declineBooking,
+  reassignBookingDentist,
 } from "@/lib/admin-bookings";
 import { getSiteUrlFromRequest } from "@/lib/site-url";
 
@@ -66,6 +67,14 @@ export async function POST(request: Request, { params }: RouteParams) {
     if (action === "confirm-attendance") {
       const { confirmPatientAttendance } = await import("@/lib/admin-bookings");
       const result = await confirmPatientAttendance(token);
+      if (result.error) {
+        return NextResponse.json({ error: result.error }, { status: 400 });
+      }
+      return NextResponse.json({ success: true, booking: result.booking });
+    }
+
+    if (action === "reassign-dentist") {
+      const result = await reassignBookingDentist(token, body.assignedDentistId ?? "");
       if (result.error) {
         return NextResponse.json({ error: result.error }, { status: 400 });
       }

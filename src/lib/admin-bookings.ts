@@ -1,5 +1,5 @@
 import { getBookingByToken, updateBooking, getAllBookings } from "@/lib/bookings-store";
-import { createCalendarEvent, deleteCalendarEvent } from "@/lib/calendar";
+import { createCalendarEvent, deleteCalendarEvent, updateCalendarEvent } from "@/lib/calendar";
 import {
   sendBookingApprovedEmail,
   sendBookingDeclinedEmail,
@@ -77,10 +77,24 @@ export async function approveBooking(
     return { error: slotError };
   }
 
-  const calendarResult = await createCalendarEvent({
+  const bookingForCalendar: Booking = {
     ...booking,
     assignedDentistId: assignedDentistId ?? booking.assignedDentistId,
-  });
+    assignedDentistName: assignedDentist?.name ?? booking.assignedDentistName,
+    status: "confirmed",
+    rescheduledByPatient: false,
+  };
+
+  let calendarEventId = booking.calendarEventId;
+  if (calendarEventId) {
+    await updateCalendarEvent({ ...bookingForCalendar, calendarEventId });
+  } else {
+    const calendarResult = await createCalendarEvent(bookingForCalendar);
+    if (calendarResult.eventId) {
+      calendarEventId = calendarResult.eventId;
+    }
+  }
+
   const updates: Partial<Booking> = {
     status: "confirmed",
     rescheduledByPatient: false,
@@ -89,8 +103,8 @@ export async function approveBooking(
     updates.assignedDentistId = assignedDentistId;
     updates.assignedDentistName = assignedDentist?.name;
   }
-  if (calendarResult.eventId) {
-    updates.calendarEventId = calendarResult.eventId;
+  if (calendarEventId) {
+    updates.calendarEventId = calendarEventId;
   }
 
   const updated = await updateBooking(token, updates);
@@ -133,6 +147,68 @@ export async function completeBooking(
     completedAt: new Date().toISOString(),
   });
   if (!updated) return { error: "Failed to update booking." };
+  return { booking: updated };
+}
+
+export async function reassignBookingDentist(
+  token: string,
+  assignedDentistId: string
+): Promise<{ booking?: Booking; error?: string }> {
+  const booking = await getBookingByToken(token);
+  if (!booking) return { error: "Booking not found." };
+  if (booking.status === "cancelled" || booking.status === "declined") {
+    return { error: "Cannot reassign dentist on a cancelled or declined booking." };
+  }
+  if (booking.status === "pending") {
+    return { error: "Approve the booking first, or change the dentist during approval." };
+  }
+
+  const dentistId = assignedDentistId.trim();
+  if (!dentistId) return { error: "Please select a dentist." };
+  if (!(await isValidDentistId(dentistId))) {
+    return { error: "Invalid dentist selected." };
+  }
+  if (booking.assignedDentistId === dentistId) {
+    return { booking };
+  }
+
+  const assignedDentist = await getDentistById(dentistId);
+  if (!assignedDentist) return { error: "Dentist not found." };
+
+  const [settings, bookings, blocks, dentists] = await Promise.all([
+    getClinicSettings(),
+    getAllBookings(),
+    getAllScheduleBlocks(),
+    getAllDentists(),
+  ]);
+
+  const slotError = validateSlotBooking({
+    date: booking.date,
+    time: booking.time,
+    settings,
+    bookings,
+    blocks,
+    dentists,
+    dentistId,
+    excludeToken: token,
+  });
+
+  if (slotError) {
+    return { error: slotError };
+  }
+
+  const updates: Partial<Booking> = {
+    assignedDentistId: dentistId,
+    assignedDentistName: assignedDentist.name,
+  };
+
+  const updated = await updateBooking(token, updates);
+  if (!updated) return { error: "Failed to update booking." };
+
+  if (updated.calendarEventId) {
+    await updateCalendarEvent(updated);
+  }
+
   return { booking: updated };
 }
 

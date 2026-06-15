@@ -33,7 +33,9 @@ export function AppointmentActions({ booking, onUpdated }: AppointmentActionsPro
     }
   }, [booking.assignedDentistId, booking.preferredDentistId, dentists, assignedDentistId]);
 
-  async function runAction(action: "approve" | "decline" | "complete" | "cancel" | "confirm-attendance") {
+  async function runAction(
+    action: "approve" | "decline" | "complete" | "cancel" | "confirm-attendance" | "reassign-dentist"
+  ) {
     if (action === "cancel") {
       const confirmed = window.confirm(
         `Cancel the appointment for ${booking.name} on ${booking.date} at ${booking.time}? The time slot will be freed on the website immediately.`
@@ -46,7 +48,7 @@ export function AppointmentActions({ booking, onUpdated }: AppointmentActionsPro
 
     try {
       const payload: Record<string, string | undefined> = { action, note: note.trim() || undefined };
-      if (action === "approve") {
+      if (action === "approve" || action === "reassign-dentist") {
         payload.assignedDentistId = assignedDentistId;
       }
 
@@ -70,6 +72,11 @@ export function AppointmentActions({ booking, onUpdated }: AppointmentActionsPro
   }
 
   const canApprove = needsStaffApproval(booking);
+  const canReassignDentist =
+    !canApprove &&
+    booking.status !== "cancelled" &&
+    booking.status !== "declined" &&
+    booking.status !== "pending";
   const canDecline =
     booking.status === "pending" ||
     booking.status === "confirmed" ||
@@ -113,6 +120,51 @@ export function AppointmentActions({ booking, onUpdated }: AppointmentActionsPro
               </a>{" "}
               first.
             </p>
+          )}
+        </div>
+      )}
+
+      {canReassignDentist && (
+        <div>
+          <label htmlFor={`reassign-dentist-${booking.token}`} className="admin-detail-label">
+            Assigned dentist
+          </label>
+          {dentistsLoading ? (
+            <p className="mt-1 text-sm text-muted">Loading dentists…</p>
+          ) : dentists.length > 0 ? (
+            <div className="mt-1.5 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <select
+                id={`reassign-dentist-${booking.token}`}
+                value={assignedDentistId}
+                onChange={(e) => setAssignedDentistId(e.target.value)}
+                className="input-field flex-1 text-sm"
+              >
+                {dentists.map((dentist) => (
+                  <option key={dentist.id} value={dentist.id}>
+                    {dentist.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={
+                  !!loading ||
+                  dentistsLoading ||
+                  !assignedDentistId ||
+                  assignedDentistId === booking.assignedDentistId
+                }
+                onClick={() => runAction("reassign-dentist")}
+                className="btn-outline btn-cta-sm shrink-0"
+              >
+                {loading === "reassign-dentist" ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  "Update dentist"
+                )}
+              </button>
+            </div>
+          ) : (
+            <p className="mt-1 text-sm text-muted">No dentists available.</p>
           )}
         </div>
       )}

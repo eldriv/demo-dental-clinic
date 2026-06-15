@@ -37,6 +37,41 @@ function parseTimeToDate(date: string, time: string): { start: Date; end: Date }
   return { start, end };
 }
 
+function getCalendarDentistName(booking: Booking): string | undefined {
+  return booking.assignedDentistName ?? booking.preferredDentistName ?? undefined;
+}
+
+export function buildCalendarEventSummary(booking: Booking): string {
+  const dentistName = getCalendarDentistName(booking);
+  const visit = `${booking.service} — ${booking.name}`;
+  return dentistName ? `${dentistName} · ${visit}` : visit;
+}
+
+export function buildCalendarEventDescription(booking: Booking): string {
+  const dentistName = getCalendarDentistName(booking);
+  const descriptionLines = [
+    `Patient: ${booking.name}`,
+    `Email: ${booking.email}`,
+    `Phone: ${booking.phone}`,
+    `Service: ${booking.service}`,
+  ];
+  if (dentistName) {
+    descriptionLines.push(`Dentist: ${dentistName}`);
+  }
+  return descriptionLines.join("\n");
+}
+
+function buildCalendarEventBody(booking: Booking) {
+  const { start, end } = parseTimeToDate(booking.date, booking.time);
+  return {
+    summary: buildCalendarEventSummary(booking),
+    description: buildCalendarEventDescription(booking),
+    start: { dateTime: start.toISOString(), timeZone: "America/Toronto" },
+    end: { dateTime: end.toISOString(), timeZone: "America/Toronto" },
+    location: site.location.full,
+  };
+}
+
 export async function createCalendarEvent(
   booking: Booking
 ): Promise<{ eventId?: string; error?: string }> {
@@ -47,28 +82,10 @@ export async function createCalendarEvent(
   try {
     const auth = getOAuth2Client();
     const calendar = google.calendar({ version: "v3", auth });
-    const { start, end } = parseTimeToDate(booking.date, booking.time);
-
-    const dentistName = booking.assignedDentistName;
-    const descriptionLines = [
-      `Patient: ${booking.name}`,
-      `Email: ${booking.email}`,
-      `Phone: ${booking.phone}`,
-      `Service: ${booking.service}`,
-    ];
-    if (dentistName) {
-      descriptionLines.push(`Dentist: ${dentistName}`);
-    }
 
     const event = await calendar.events.insert({
       calendarId: process.env.GOOGLE_CALENDAR_ID!,
-      requestBody: {
-        summary: `${booking.service} — ${booking.name}`,
-        description: descriptionLines.join("\n"),
-        start: { dateTime: start.toISOString(), timeZone: "America/Toronto" },
-        end: { dateTime: end.toISOString(), timeZone: "America/Toronto" },
-        location: site.location.full,
-      },
+      requestBody: buildCalendarEventBody(booking),
     });
 
     return { eventId: event.data.id ?? undefined };
@@ -88,15 +105,11 @@ export async function updateCalendarEvent(
   try {
     const auth = getOAuth2Client();
     const calendar = google.calendar({ version: "v3", auth });
-    const { start, end } = parseTimeToDate(booking.date, booking.time);
 
     await calendar.events.patch({
       calendarId: process.env.GOOGLE_CALENDAR_ID!,
       eventId: booking.calendarEventId,
-      requestBody: {
-        start: { dateTime: start.toISOString(), timeZone: "America/Toronto" },
-        end: { dateTime: end.toISOString(), timeZone: "America/Toronto" },
-      },
+      requestBody: buildCalendarEventBody(booking),
     });
 
     return { success: true };
