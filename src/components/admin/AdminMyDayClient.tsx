@@ -188,7 +188,6 @@ function MyDayRow({
               rows={2}
               className="input-field mt-1 text-xs"
               placeholder="Brief treatment summary"
-              disabled={isDone && !visitNotes && !booking.visitNotes}
             />
           </div>
 

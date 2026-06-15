@@ -369,24 +369,25 @@ export function AdminStaffBookingForm() {
                 ))}
               </select>
             </div>
-            <div className="sm:col-span-2">
-              <label htmlFor="staff-service" className="admin-book-label">Service</label>
-              <select
-                id="staff-service"
-                required={!isGroup}
-                value={service}
-                onChange={(e) => setService(e.target.value)}
-                className="input-field py-2 text-sm"
-                disabled={isGroup}
-              >
-                <option value="">{isGroup ? "Set per patient below" : "Select service"}</option>
-                {services.map((s) => (
-                  <option key={s.id} value={s.name}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {!isGroup && (
+              <div className="sm:col-span-2">
+                <label htmlFor="staff-service" className="admin-book-label">Service</label>
+                <select
+                  id="staff-service"
+                  required
+                  value={service}
+                  onChange={(e) => setService(e.target.value)}
+                  className="input-field py-2 text-sm"
+                >
+                  <option value="">Select service</option>
+                  {services.map((s) => (
+                    <option key={s.id} value={s.name}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           {isGroup && (
