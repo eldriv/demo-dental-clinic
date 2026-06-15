@@ -55,7 +55,7 @@ npm run dev
 4. Enter their email and click **Send invite**.
 5. The dentist opens the email link, sets a password at `/admin/accept-invite`, then signs in at `/admin/login`.
 
-Only the clinic owner can send or revoke dentist invites. Owner and front desk accounts still use the passwords from environment variables.
+Only the clinic owner can send or revoke dentist invites. Owner and front desk accounts use the passwords from environment variables. On Netlify, changing `ADMIN_PASSWORD` or `ADMIN_OWNER_EMAIL` and redeploying updates the stored login automatically.
 
 ## 4. Netlify Deployment
 

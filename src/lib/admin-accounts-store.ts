@@ -1,6 +1,6 @@
 import { getStore } from "@netlify/blobs";
 import type { AdminRole } from "@/content/admin";
-import { hashAdminPassword } from "@/lib/admin-password";
+import { hashAdminPassword, verifyAdminPassword } from "@/lib/admin-password";
 import { DEFAULT_DENTISTS } from "@/lib/dentists";
 import { shouldUseNetlifyBlobs } from "@/lib/storage-env";
 
@@ -120,6 +120,82 @@ async function migrateLegacyAdminEmails(
   return next;
 }
 
+/** Keep owner/staff email + password aligned with Netlify env in production. */
+async function syncEnvManagedAccounts(
+  accounts: StoredAdminAccount[]
+): Promise<StoredAdminAccount[]> {
+  if (process.env.NODE_ENV !== "production") return accounts;
+
+  const now = new Date().toISOString();
+  let changed = false;
+  const next = [...accounts];
+
+  async function upsertManagedAccount(
+    id: "owner" | "staff",
+    role: AdminRole,
+    name: string,
+    email: string | undefined,
+    password: string | undefined
+  ): Promise<void> {
+    if (!email?.includes("@") || !password) return;
+
+    const index = next.findIndex((account) => account.id === id);
+    if (index === -1) {
+      next.push({
+        id,
+        email,
+        name,
+        role,
+        passwordHash: await hashAdminPassword(password),
+        createdAt: now,
+        status: "active",
+      });
+      changed = true;
+      return;
+    }
+
+    const current = next[index];
+    const emailChanged = current.email.toLowerCase() !== email.toLowerCase();
+    const passwordMatches = await verifyAdminPassword(password, current.passwordHash);
+
+    if (!emailChanged && passwordMatches && current.status === "active") {
+      return;
+    }
+
+    next[index] = {
+      ...current,
+      email,
+      name,
+      role,
+      status: "active",
+      passwordHash: passwordMatches ? current.passwordHash : await hashAdminPassword(password),
+    };
+    changed = true;
+  }
+
+  await upsertManagedAccount(
+    "owner",
+    "owner",
+    "Clinic Owner",
+    resolveOwnerEmail(true),
+    process.env.ADMIN_PASSWORD
+  );
+  await upsertManagedAccount(
+    "staff",
+    "staff",
+    "Front Desk",
+    resolveStaffEmail(true),
+    process.env.ADMIN_PASSWORD_STAFF
+  );
+
+  if (changed) {
+    await writeStoredAccounts(next);
+    accountsPromise = Promise.resolve(next);
+  }
+
+  return next;
+}
+
 async function buildBootstrapAccounts(): Promise<StoredAdminAccount[]> {
   const now = new Date().toISOString();
   const accounts: StoredAdminAccount[] = [];
@@ -218,7 +294,8 @@ function invalidateAdminAccountsCache(): void {
 export async function loadFreshAdminAccounts(): Promise<StoredAdminAccount[]> {
   const stored = await readStoredAccounts();
   if (stored.length > 0) {
-    return migrateLegacyAdminEmails(stored);
+    const migrated = await migrateLegacyAdminEmails(stored);
+    return await syncEnvManagedAccounts(migrated);
   }
   return getAllAdminAccounts();
 }
@@ -263,7 +340,8 @@ export async function getAllAdminAccounts(): Promise<StoredAdminAccount[]> {
       const stored = await readStoredAccounts();
       if (stored.length > 0) {
         const migrated = await migrateLegacyAdminEmails(stored);
-        return ensureDevDentistSeeds(migrated);
+        const synced = await syncEnvManagedAccounts(migrated);
+        return ensureDevDentistSeeds(synced);
       }
 
       const seeded = await buildBootstrapAccounts();
