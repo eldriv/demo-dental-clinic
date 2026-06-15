@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSessionFromCookies } from "@/lib/admin-auth";
-import { getAdminAccountById } from "@/content/admin";
+import { getAdminAccountById } from "@/lib/admin-accounts";
 import { listBookingsForAdmin, filterTodayForDentist } from "@/lib/admin-bookings";
 import { getPatientRecord } from "@/lib/patient-profile";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
@@ -12,7 +12,7 @@ export default async function AdminMyDayPage() {
   const session = await getSessionFromCookies();
   if (!session) redirect("/admin/login");
 
-  const account = getAdminAccountById(session.sub);
+  const account = await getAdminAccountById(session.sub);
   const dentistId = account?.linkedDentistId;
 
   if (!dentistId) {

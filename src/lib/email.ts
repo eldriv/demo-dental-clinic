@@ -9,6 +9,7 @@ import {
   buildPatientApprovedEmail,
   buildPatientDeclinedEmail,
   buildPatientRequestEmail,
+  buildDentistInviteEmail,
   formatDisplayDate,
 } from "./email-templates";
 
@@ -328,6 +329,34 @@ export async function sendAppointmentReminderEmail(
         cta: { label: "Manage or check in", href: manageUrl, color: "primary" },
         footerNote: "Running late? Use the manage link to notify the front desk.",
       }),
+    });
+
+    return { sent: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Email send failed";
+    return { sent: false, error: message };
+  }
+}
+
+export async function sendDentistInviteEmail(
+  invite: { token: string; name: string; email: string; expiresAt: string },
+  siteUrl?: string
+): Promise<{ sent: boolean; error?: string }> {
+  if (!isSmtpConfigured()) {
+    return { sent: false, error: "SMTP not configured" };
+  }
+
+  const baseUrl = siteUrl ?? getSiteUrl();
+  const transporter = createTransporter();
+  const acceptUrl = `${baseUrl}/admin/accept-invite?token=${encodeURIComponent(invite.token)}`;
+
+  try {
+    await transporter.sendMail({
+      from: `"${site.name}" <${process.env.SMTP_USER}>`,
+      to: invite.email,
+      subject: `Set up your dentist account — ${site.name}`,
+      text: `Hi ${invite.name},\n\nYou've been invited to join the ${site.name} staff dashboard.\n\nCreate your account: ${acceptUrl}\n\nThis link expires on ${invite.expiresAt}.\n\n${site.name}`,
+      html: buildDentistInviteEmail(invite, acceptUrl),
     });
 
     return { sent: true };

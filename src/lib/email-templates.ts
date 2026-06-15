@@ -204,6 +204,31 @@ export function buildPatientDeclinedEmail(
   });
 }
 
+export function buildDentistInviteEmail(
+  invite: { name: string; email: string; expiresAt: string },
+  acceptUrl: string
+): string {
+  const expires = new Date(invite.expiresAt).toLocaleDateString("en-PH", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  return buildBrandedEmail({
+    preheader: `Set up your ${site.name} dentist account.`,
+    heading: "You're invited to join the clinic dashboard",
+    intro: `Hi ${invite.name}, the clinic owner invited you to create your dentist login for ${site.name}. Use the button below to choose your password and access My Day, visit notes, and your schedule.`,
+    rows: [
+      { label: "Email", value: invite.email },
+      { label: "Role", value: "Dentist" },
+      { label: "Invite expires", value: expires },
+    ],
+    cta: { label: "Set up my account", href: acceptUrl, color: "primary" },
+    footerNote: "If you were not expecting this invite, you can ignore this email.",
+  });
+}
+
 export function buildConfirmSuccessPage(
   booking: Booking,
   alreadyConfirmed = false,

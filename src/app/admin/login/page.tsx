@@ -3,13 +3,13 @@
 import { Suspense, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, ShieldCheck, Stethoscope } from "lucide-react";
-import { adminAccounts } from "@/content/admin";
 import { site } from "@/content";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [email, setEmail] = useState("staff");
+  const created = searchParams.get("created") === "1";
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -31,7 +31,9 @@ function LoginForm() {
         return;
       }
 
-      const next = searchParams.get("next") || "/admin";
+      const next =
+        searchParams.get("next") ||
+        (data.user?.role === "dentist" ? "/admin/my-day" : "/admin");
       router.push(next);
       router.refresh();
     } catch {
@@ -79,26 +81,30 @@ function LoginForm() {
 
           <div className="mb-6 hidden lg:block">
             <h2 className="text-2xl font-bold tracking-tight text-dark">Welcome back</h2>
-            <p className="mt-1 text-sm text-muted">Sign in to continue to the dashboard.</p>
+            <p className="mt-1 text-sm text-muted">Sign in with your clinic email and password.</p>
           </div>
+
+          {created && (
+            <div className="mb-4 rounded-xl border border-primary/15 bg-primary/5 px-3 py-2 text-sm text-primary">
+              Your dentist account is ready. Sign in below.
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-gray-700">
-                Account
+                Email or account ID
               </label>
-              <select
+              <input
                 id="email"
+                type="text"
+                required
+                autoComplete="username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="input-field"
-              >
-                {adminAccounts.map((account) => (
-                  <option key={account.id} value={account.email}>
-                    {account.name}
-                  </option>
-                ))}
-              </select>
+                placeholder="you@clinic.ph or owner"
+              />
             </div>
 
             <div>
@@ -109,6 +115,7 @@ function LoginForm() {
                 id="password"
                 type="password"
                 required
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="input-field"
@@ -127,11 +134,15 @@ function LoginForm() {
             </button>
           </form>
 
+          <p className="mt-6 text-xs leading-relaxed text-muted">
+            Dentists join through an invite link from the clinic owner. If you received an invite,
+            open that link first to create your password.
+          </p>
+
           {process.env.NODE_ENV === "development" && (
-            <p className="mt-6 text-xs leading-relaxed text-muted">
-              Local dev passwords: owner/staff{" "}
-              <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-[11px]">smilecare2026</code>
-              {" · "}dentists{" "}
+            <p className="mt-4 text-xs leading-relaxed text-muted">
+              Local dev: owner/staff <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-[11px]">smilecare2026</code>
+              {" · "}seeded dentists <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-[11px]">dr-chen</code> /{" "}
               <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-[11px]">dentist2026</code>
             </p>
           )}

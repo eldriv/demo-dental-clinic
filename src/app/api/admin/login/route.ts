@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   authenticateAdmin,
-  createSessionToken,
+  createSessionTokenForAccount,
   sessionCookieOptions,
 } from "@/lib/admin-auth";
 
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
     }
 
-    const token = await createSessionToken(account);
+    const token = await createSessionTokenForAccount(account);
     const response = NextResponse.json({
       success: true,
       user: {

@@ -34,9 +34,21 @@ If SMTP is not configured, bookings still save but patients see a message to cal
 
 Bookings are stored in `.data/bookings/bookings.json` during development. This directory is gitignored.
 
+On first run, owner and staff accounts are seeded into `.data/bookings/admin-accounts.json` using `ADMIN_PASSWORD` and `ADMIN_PASSWORD_STAFF` (or local dev defaults). Dentist logins are **not** created from environment variables in production — the clinic owner invites each dentist from **Admin → Dentists**.
+
 ```bash
 npm run dev
 ```
+
+### Dentist accounts (invite-only)
+
+1. Sign in as **owner**.
+2. Open **Admin → Dentists**.
+3. Add the dentist profile if needed.
+4. Enter their email and click **Send invite**.
+5. The dentist opens the email link, sets a password at `/admin/accept-invite`, then signs in at `/admin/login`.
+
+Only the clinic owner can send or revoke dentist invites. Owner and front desk accounts still use the passwords from environment variables.
 
 ## 4. Netlify Deployment
 

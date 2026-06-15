@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { verifySessionToken, ADMIN_SESSION_COOKIE } from "@/lib/admin-auth";
+import { verifySessionTokenEdge, ADMIN_SESSION_COOKIE } from "@/lib/admin-session";
 import {
   getDefaultAdminPath,
   isDentistRole,
@@ -24,8 +24,15 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  if (
+    pathname === "/admin/accept-invite" ||
+    pathname.startsWith("/api/admin/invites/accept")
+  ) {
+    return NextResponse.next();
+  }
+
   const token = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
-  const session = token ? await verifySessionToken(token) : null;
+  const session = token ? await verifySessionTokenEdge(token) : null;
 
   if (!session) {
     if (isAdminApi) {

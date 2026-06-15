@@ -24,27 +24,15 @@ export const adminAccounts: AdminAccount[] = [
     name: "Front Desk",
     role: "staff",
   },
-  {
-    id: "dentist-chen",
-    email: "dr-chen",
-    name: "Dr. Sarah Chen",
-    role: "dentist",
-    linkedDentistId: "dr-chen",
-  },
-  {
-    id: "dentist-patel",
-    email: "dr-patel",
-    name: "Dr. Raj Patel",
-    role: "dentist",
-    linkedDentistId: "dr-patel",
-  },
 ];
 
+/** @deprecated Use async helpers from `@/lib/admin-accounts` instead. */
 export function getAdminAccountByEmail(email: string): AdminAccount | undefined {
   const normalized = email.trim().toLowerCase();
   return adminAccounts.find((account) => account.email.toLowerCase() === normalized);
 }
 
+/** @deprecated Use async helpers from `@/lib/admin-accounts` instead. */
 export function getAdminAccountById(id: string): AdminAccount | undefined {
   return adminAccounts.find((account) => account.id === id);
 }
