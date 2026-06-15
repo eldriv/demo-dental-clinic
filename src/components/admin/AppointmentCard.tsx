@@ -29,6 +29,7 @@ import {
   formatBookingTimeRange,
   isGroupBooking,
 } from "@/lib/booking-group";
+import { GroupMembersPanel } from "@/components/admin/GroupMembersPanel";
 
 type ActionName =
   | "approve"
@@ -40,6 +41,11 @@ type ActionName =
   | "mark-no-show"
   | "update-internal-notes"
   | "set-follow-up";
+
+function telHref(phone?: string): string {
+  const digits = phone?.replace(/[^\d+]/g, "") ?? "";
+  return digits ? `tel:${digits}` : "#";
+}
 
 function ActionButton({
   children,
@@ -244,7 +250,7 @@ export function AppointmentCard({ booking, onUpdated }: AppointmentCardProps) {
             </button>
           )}
           <a
-            href={`tel:${booking.phone.replace(/[^\d+]/g, "")}`}
+            href={telHref(booking.phone)}
             className="admin-appt-icon-btn"
             title="Call"
           >
@@ -278,8 +284,8 @@ export function AppointmentCard({ booking, onUpdated }: AppointmentCardProps) {
           <div className="admin-appt-meta text-xs text-muted">
             <span>{booking.date}</span>
             <span>·</span>
-            <a href={`tel:${booking.phone.replace(/[^\d+]/g, "")}`} className="text-primary hover:underline">
-              {booking.phone}
+            <a href={telHref(booking.phone)} className="text-primary hover:underline">
+              {booking.phone || "—"}
             </a>
             <span>·</span>
             <a href={`mailto:${booking.email}`} className="truncate text-primary hover:underline">
@@ -296,42 +302,8 @@ export function AppointmentCard({ booking, onUpdated }: AppointmentCardProps) {
             )}
           </div>
 
-          {isGroupBooking(booking) && (booking.attendees?.length ?? 0) > 0 && (
-            <div className="rounded-lg border border-gray-100 bg-surface/40 px-2.5 py-2 text-xs">
-              <p className="mb-1.5 font-medium text-slate-700">Group members</p>
-              <ul className="space-y-1 text-muted">
-                <li>
-                  <a
-                    href={`/admin/patients?email=${encodeURIComponent(booking.email)}`}
-                    className="font-medium text-primary hover:underline"
-                  >
-                    {booking.name}
-                  </a>
-                  <span> — organizer · {booking.email}</span>
-                </li>
-                {(booking.attendees ?? [])
-                  .filter(
-                    (attendee) =>
-                      attendee.email.trim().toLowerCase() !== booking.email.trim().toLowerCase()
-                  )
-                  .map((attendee) => (
-                  <li key={attendee.email}>
-                    <a
-                      href={`/admin/patients?email=${encodeURIComponent(attendee.email)}`}
-                      className="font-medium text-primary hover:underline"
-                    >
-                      {attendee.name}
-                    </a>
-                    <span>
-                      {" "}
-                      — {attendee.service}
-                      {attendee.email ? ` · ${attendee.email}` : ""}
-                      {attendee.phone ? ` · ${attendee.phone}` : ""}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+          {isGroupBooking(booking) && (
+            <GroupMembersPanel booking={booking} />
           )}
 
           {booking.internalNotes && (
@@ -496,7 +468,7 @@ export function AppointmentCard({ booking, onUpdated }: AppointmentCardProps) {
                 <ExternalLink className="size-3.5" />
                 Patient view
               </a>
-              <a href={`tel:${booking.phone.replace(/[^\d+]/g, "")}`} className="admin-appt-quicklink">
+              <a href={telHref(booking.phone)} className="admin-appt-quicklink">
                 <Phone className="size-3.5" />
                 Call
               </a>

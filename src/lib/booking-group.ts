@@ -102,12 +102,71 @@ export function getPatientServiceOnBooking(
 }
 
 export function formatGroupAttendeesList(booking: Pick<Booking, "attendees">): string {
-  return (booking.attendees ?? [])
+  return normalizeGroupAttendees(booking.attendees)
     .map((attendee) => {
       const contact = attendee.email ? ` · ${attendee.email}` : "";
       return `${attendee.name} — ${attendee.service}${contact}`;
     })
     .join("\n");
+}
+
+export interface GroupMemberRow {
+  name: string;
+  service: string;
+  email?: string;
+  phone?: string;
+  role: "organizer" | "attendee";
+}
+
+export function normalizeGroupAttendees(attendees: unknown): GroupAttendee[] {
+  if (!Array.isArray(attendees)) return [];
+
+  return attendees
+    .filter(
+      (entry): entry is GroupAttendee =>
+        Boolean(entry) && typeof entry === "object" && typeof (entry as GroupAttendee).name === "string"
+    )
+    .map((attendee) => ({
+      name: attendee.name?.trim() ?? "",
+      service: attendee.service?.trim() ?? "",
+      email: attendee.email?.trim() || undefined,
+      phone: attendee.phone?.trim() || undefined,
+    }))
+    .filter((attendee) => attendee.name.length > 0);
+}
+
+export function buildGroupMemberRows(booking: Booking): GroupMemberRow[] {
+  const organizerEmail = booking.email?.trim().toLowerCase() ?? "";
+  const organizerAttendee = organizerEmail ? getAttendeeForEmail(booking, booking.email) : undefined;
+  const organizerService =
+    organizerAttendee?.service?.trim() ||
+    booking.service.replace(/\s*\(group\)\s*$/i, "").trim() ||
+    booking.service;
+
+  const rows: GroupMemberRow[] = [
+    {
+      name: booking.name?.trim() || "Organizer",
+      email: booking.email?.trim() || undefined,
+      phone: booking.phone?.trim() || undefined,
+      service: organizerService,
+      role: "organizer",
+    },
+  ];
+
+  for (const attendee of normalizeGroupAttendees(booking.attendees)) {
+    const email = attendee.email?.trim().toLowerCase() ?? "";
+    if (email && email === organizerEmail) continue;
+
+    rows.push({
+      name: attendee.name,
+      email: attendee.email,
+      phone: attendee.phone,
+      service: attendee.service,
+      role: "attendee",
+    });
+  }
+
+  return rows;
 }
 
 export function formatBookingTimeRange(booking: Pick<Booking, "time" | "endTime" | "bookingKind" | "partySize">): string {
@@ -117,7 +176,7 @@ export function formatBookingTimeRange(booking: Pick<Booking, "time" | "endTime"
 
 export function formatBookingServiceLabel(booking: Booking): string {
   if (!isGroupBooking(booking)) return booking.service;
-  const services = [...new Set((booking.attendees ?? []).map((a) => a.service).filter(Boolean))];
+  const services = [...new Set(normalizeGroupAttendees(booking.attendees).map((a) => a.service).filter(Boolean))];
   if (services.length === 1) return `${services[0]} (group)`;
   if (services.length > 1) return `Multiple services (group)`;
   return booking.service;
@@ -138,13 +197,15 @@ export function validateGroupAttendees(attendees: GroupAttendee[] | undefined): 
       return `Select a service for ${attendee.name.trim() || `patient ${index + 1}`}.`;
     }
     const email = attendee.email?.trim().toLowerCase() ?? "";
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return `Enter a valid email for ${attendee.name.trim() || `patient ${index + 1}`}.`;
+    if (email) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return `Enter a valid email for ${attendee.name.trim() || `patient ${index + 1}`}.`;
+      }
+      if (seenEmails.has(email)) {
+        return `Each patient in a group needs a unique email (${email} is duplicated).`;
+      }
+      seenEmails.add(email);
     }
-    if (seenEmails.has(email)) {
-      return `Each patient in a group needs a unique email (${email} is duplicated).`;
-    }
-    seenEmails.add(email);
     if (attendee.phone?.trim() && attendee.phone.trim().length < BOOKING_VALIDATION.phone.min) {
       return `Enter a valid phone for ${attendee.name.trim()}.`;
     }
@@ -265,7 +326,7 @@ export function normalizeStaffGroupBookingInput(
   const attendees = (body.attendees ?? []).map((attendee) => ({
     name: attendee.name.trim(),
     service: attendee.service.trim(),
-    email: attendee.email.trim().toLowerCase(),
+    email: attendee.email?.trim().toLowerCase() || undefined,
     phone: attendee.phone?.trim() || undefined,
   }));
 

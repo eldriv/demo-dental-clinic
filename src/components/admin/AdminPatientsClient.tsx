@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   Calendar,
+  ChevronDown,
   ChevronRight,
   FileText,
   Mail,
@@ -16,8 +17,18 @@ import {
   X,
 } from "lucide-react";
 import type { Booking } from "@/lib/bookings";
-import type { PatientClinicStatus, PatientRecord, PatientSummary } from "@/lib/patient-profile";
-import { getPatientServiceOnBooking } from "@/lib/booking-group";
+import type {
+  PatientClinicStatus,
+  PatientRecord,
+  PatientSummary,
+  PatientTreatment,
+} from "@/lib/patient-profile";
+import {
+  buildGroupMemberRows,
+  getPatientServiceOnBooking,
+  isGroupBooking,
+} from "@/lib/booking-group";
+import { GroupMembersPanel } from "@/components/admin/GroupMembersPanel";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { formatBookingWhen } from "@/components/admin/StatusBadge";
 
@@ -58,6 +69,129 @@ function PatientAvatar({ name, large = false }: { name: string; large?: boolean 
   );
 }
 
+function telHref(phone?: string): string {
+  const digits = phone?.replace(/[^\d+]/g, "") ?? "";
+  return digits ? `tel:${digits}` : "#";
+}
+
+function PatientTimelineVisit({ visit }: { visit: PatientTreatment }) {
+  const [expanded, setExpanded] = useState(false);
+  const timeLabel =
+    visit.isGroup && visit.endTime ? `${visit.time} – ${visit.endTime}` : visit.time;
+
+  return (
+    <div className={`admin-patient-timeline-card ${visit.isGroup ? "admin-patient-timeline-card-group" : ""}`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          {visit.isGroup ? (
+            <button
+              type="button"
+              onClick={() => setExpanded((open) => !open)}
+              className="group flex w-full items-start gap-1.5 text-left"
+              aria-expanded={expanded}
+            >
+              <ChevronDown
+                className={`mt-0.5 size-4 shrink-0 text-muted transition-transform ${
+                  expanded ? "rotate-180" : ""
+                }`}
+              />
+              <span className="min-w-0">
+                <span className="block text-sm font-medium text-slate-800 group-hover:text-primary">
+                  {visit.service}
+                </span>
+                <span className="mt-0.5 block text-xs text-muted">
+                  {visit.date} · {timeLabel}
+                  {visit.dentist ? ` · ${visit.dentist}` : ""}
+                </span>
+              </span>
+            </button>
+          ) : (
+            <>
+              <p className="text-sm font-medium text-slate-800">{visit.service}</p>
+              <p className="mt-0.5 text-xs text-muted">
+                {visit.date} · {timeLabel}
+                {visit.dentist ? ` · ${visit.dentist}` : ""}
+              </p>
+            </>
+          )}
+        </div>
+        <span className={`admin-patient-status ${visitStatusClass(visit.status)}`}>
+          {visit.statusLabel}
+        </span>
+      </div>
+
+      {visit.isGroup && expanded && visit.groupMembers && visit.groupMembers.length > 0 && (
+        <GroupMembersPanel members={visit.groupMembers} className="mt-2" />
+      )}
+
+      {visit.visitNotes ? (
+        <div className="admin-patient-note-block">
+          <p className="admin-patient-note-label">
+            <FileText className="size-3" />
+            Dentist note
+          </p>
+          <p className="text-xs leading-relaxed text-slate-700">{visit.visitNotes}</p>
+        </div>
+      ) : visit.status === "completed" ? (
+        <p className="admin-patient-note-missing">No note recorded</p>
+      ) : null}
+
+      {visit.internalNotes && (
+        <div className="admin-patient-staff-block">
+          <p className="admin-patient-note-label">Staff note</p>
+          <p className="text-xs text-amber-950">{visit.internalNotes}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PatientUpcomingBanner({
+  booking,
+  patientEmail,
+}: {
+  booking: Booking;
+  patientEmail: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const isGroup = isGroupBooking(booking);
+  const groupMembers = isGroup ? buildGroupMemberRows(booking) : [];
+
+  return (
+    <div className="admin-patient-banner admin-patient-banner-upcoming">
+      <Calendar className="size-3.5 shrink-0 text-green-700" />
+      <div className="min-w-0 flex-1">
+        {isGroup ? (
+          <button
+            type="button"
+            onClick={() => setExpanded((open) => !open)}
+            className="group w-full text-left"
+            aria-expanded={expanded}
+          >
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-green-800">Upcoming</p>
+            <p className="flex items-center gap-1 text-xs text-green-900">
+              <ChevronDown
+                className={`size-3.5 shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`}
+              />
+              {getPatientServiceOnBooking(booking, patientEmail)} · {formatBookingWhen(booking)}
+            </p>
+          </button>
+        ) : (
+          <>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-green-800">Upcoming</p>
+            <p className="text-xs text-green-900">
+              {getPatientServiceOnBooking(booking, patientEmail)} · {formatBookingWhen(booking)}
+            </p>
+          </>
+        )}
+        {isGroup && expanded && groupMembers.length > 0 && (
+          <GroupMembersPanel members={groupMembers} className="mt-2" />
+        )}
+      </div>
+    </div>
+  );
+}
+
 function PatientDetailPanel({
   patient,
   onClose,
@@ -78,7 +212,7 @@ function PatientDetailPanel({
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <a
-            href={`tel:${patient.phone.replace(/[^\d+]/g, "")}`}
+            href={telHref(patient.phone)}
             className="admin-appt-icon-btn"
             title="Call"
           >
@@ -115,16 +249,7 @@ function PatientDetailPanel({
       )}
 
       {patient.upcoming && (
-        <div className="admin-patient-banner admin-patient-banner-upcoming">
-          <Calendar className="size-3.5 shrink-0 text-green-700" />
-          <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-green-800">Upcoming</p>
-            <p className="text-xs text-green-900">
-              {getPatientServiceOnBooking(patient.upcoming, patient.email)} ·{" "}
-              {formatBookingWhen(patient.upcoming)}
-            </p>
-          </div>
-        </div>
+        <PatientUpcomingBanner booking={patient.upcoming} patientEmail={patient.email} />
       )}
 
       <div className="admin-patient-section">
@@ -143,39 +268,7 @@ function PatientDetailPanel({
                 {index < patient.treatmentHistory.length - 1 && (
                   <span className="admin-patient-timeline-line" aria-hidden />
                 )}
-                <div className="admin-patient-timeline-card">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-slate-800">{visit.service}</p>
-                      <p className="mt-0.5 text-xs text-muted">
-                        {visit.date} · {visit.time}
-                        {visit.dentist ? ` · ${visit.dentist}` : ""}
-                      </p>
-                    </div>
-                    <span className={`admin-patient-status ${visitStatusClass(visit.status)}`}>
-                      {visit.statusLabel}
-                    </span>
-                  </div>
-
-                  {visit.visitNotes ? (
-                    <div className="admin-patient-note-block">
-                      <p className="admin-patient-note-label">
-                        <FileText className="size-3" />
-                        Dentist note
-                      </p>
-                      <p className="text-xs leading-relaxed text-slate-700">{visit.visitNotes}</p>
-                    </div>
-                  ) : visit.status === "completed" ? (
-                    <p className="admin-patient-note-missing">No note recorded</p>
-                  ) : null}
-
-                  {visit.internalNotes && (
-                    <div className="admin-patient-staff-block">
-                      <p className="admin-patient-note-label">Staff note</p>
-                      <p className="text-xs text-amber-950">{visit.internalNotes}</p>
-                    </div>
-                  )}
-                </div>
+                <PatientTimelineVisit visit={visit} />
               </li>
             ))}
           </ul>

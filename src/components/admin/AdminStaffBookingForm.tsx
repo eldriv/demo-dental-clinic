@@ -212,15 +212,9 @@ export function AdminStaffBookingForm() {
   const startSlotIndex = timeSlots.findIndex((slot) => slot.time === selectedTime);
   const endTimeOptions =
     startSlotIndex >= 0 ? timeSlots.slice(startSlotIndex + 1).map((slot) => slot.time) : [];
-  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const attendeesValid =
     attendees.length >= GROUP_BOOKING_MIN_PARTY &&
-    attendees.every(
-      (row) =>
-        row.name.trim().length >= 2 &&
-        row.service.trim() &&
-        emailPattern.test(row.email.trim())
-    );
+    attendees.every((row) => row.name.trim().length >= 2 && row.service.trim());
   const canSubmit = Boolean(
     assignedDentistId &&
       name &&
@@ -422,11 +416,10 @@ export function AdminStaffBookingForm() {
                       />
                     </div>
                     <div>
-                      <label className="admin-book-label">Email</label>
+                      <label className="admin-book-label">Email (optional)</label>
                       <input
-                        required
                         type="email"
-                        value={attendee.email}
+                        value={attendee.email ?? ""}
                         onChange={(e) => updateAttendee(index, "email", e.target.value)}
                         className="input-field py-2 text-sm"
                         placeholder="email@example.com"

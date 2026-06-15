@@ -2,11 +2,15 @@ import type { Booking } from "./bookings";
 import { sortBookingsByDateTime } from "./admin-booking-filters";
 import { getBookingStatusLabel } from "./booking-status";
 import {
+  buildGroupMemberRows,
   getPatientNameOnBooking,
   getPatientPhoneOnBooking,
   getPatientServiceOnBooking,
+  getBookingEndTime,
   isGroupBooking,
+  normalizeGroupAttendees,
 } from "./booking-group";
+import type { GroupMemberRow } from "./booking-group";
 
 export type PatientClinicStatus = "new" | "returning";
 
@@ -20,6 +24,9 @@ export interface PatientTreatment {
   visitNotes?: string;
   internalNotes?: string;
   token: string;
+  isGroup?: boolean;
+  endTime?: string;
+  groupMembers?: GroupMemberRow[];
 }
 
 export interface PatientClinicalNote {
@@ -86,7 +93,7 @@ export function groupBookingsByPatient(bookings: Booking[]): Map<string, Booking
     }
 
     if (isGroupBooking(booking)) {
-      for (const attendee of booking.attendees ?? []) {
+      for (const attendee of normalizeGroupAttendees(booking.attendees)) {
         const attendeeEmail = normalizeEmail(attendee.email ?? "");
         if (!attendeeEmail) continue;
         addPatientBooking(groups, attendeeEmail, booking);
@@ -152,6 +159,7 @@ function buildPatientSummary(email: string, patientBookings: Booking[]): Patient
 }
 
 function toTreatment(booking: Booking, patientEmail: string): PatientTreatment {
+  const group = isGroupBooking(booking);
   return {
     date: booking.date,
     time: booking.time,
@@ -162,6 +170,9 @@ function toTreatment(booking: Booking, patientEmail: string): PatientTreatment {
     visitNotes: booking.visitNotes?.trim() || undefined,
     internalNotes: booking.internalNotes?.trim() || undefined,
     token: booking.token,
+    isGroup: group,
+    endTime: group ? getBookingEndTime(booking) : undefined,
+    groupMembers: group ? buildGroupMemberRows(booking) : undefined,
   };
 }
 
@@ -275,7 +286,7 @@ export function findPatientByEmailPrefix(
     ];
 
     if (isGroupBooking(booking)) {
-      for (const attendee of booking.attendees ?? []) {
+      for (const attendee of normalizeGroupAttendees(booking.attendees)) {
         const email = normalizeEmail(attendee.email ?? "");
         if (email) candidates.push({ email, name: attendee.name });
       }

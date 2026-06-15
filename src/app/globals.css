@@ -697,6 +697,34 @@ body {
   @apply min-w-0 flex-1 rounded-xl border border-gray-100 bg-surface/30 px-3 py-2.5;
 }
 
+.admin-patient-timeline-card-group {
+  @apply border-primary/15 bg-white;
+}
+
+.admin-group-members {
+  @apply rounded-lg border border-gray-100 bg-surface/50 px-2.5 py-2;
+}
+
+.admin-group-members-meta {
+  @apply mb-2;
+}
+
+.admin-group-members-list {
+  @apply space-y-2;
+}
+
+.admin-group-member-row {
+  @apply rounded-lg border border-gray-100 bg-white px-2.5 py-2;
+}
+
+.admin-group-member-role {
+  @apply rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-600;
+}
+
+.admin-group-member-role-organizer {
+  @apply bg-primary/10 text-primary;
+}
+
 .admin-patient-status {
   @apply shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium;
 }

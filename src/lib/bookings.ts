@@ -5,7 +5,7 @@ export type BookingKind = "individual" | "group";
 export interface GroupAttendee {
   name: string;
   service: string;
-  email: string;
+  email?: string;
   phone?: string;
 }
 

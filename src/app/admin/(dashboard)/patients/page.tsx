@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getSessionFromCookies } from "@/lib/admin-auth";
 import { listBookingsForAdmin } from "@/lib/admin-bookings";
@@ -13,5 +14,9 @@ export default async function AdminPatientsPage() {
   const bookings = await listBookingsForAdmin();
   const patients = listPatientSummaries(bookings);
 
-  return <AdminPatientsClient initialPatients={patients} />;
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-muted">Loading patients…</div>}>
+      <AdminPatientsClient initialPatients={patients} />
+    </Suspense>
+  );
 }
