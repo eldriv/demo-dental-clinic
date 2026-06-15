@@ -74,34 +74,36 @@ function envPasswordForAccountId(accountId: string): string | undefined {
 }
 
 function resolveOwnerEmail(isProduction: boolean): string | undefined {
-  if (!isProduction) return "owner";
-  return (
-    process.env.ADMIN_OWNER_EMAIL?.trim().toLowerCase() ||
-    process.env.CLINIC_EMAIL?.trim().toLowerCase()
-  );
+  const fromEnv = process.env.ADMIN_OWNER_EMAIL?.trim().toLowerCase();
+  if (fromEnv) return fromEnv;
+  if (isProduction) {
+    return process.env.CLINIC_EMAIL?.trim().toLowerCase();
+  }
+  return "owner";
 }
 
 function resolveStaffEmail(isProduction: boolean): string | undefined {
+  const fromEnv = process.env.ADMIN_STAFF_EMAIL?.trim().toLowerCase();
+  if (fromEnv) return fromEnv;
   if (!isProduction) return "staff";
-  return process.env.ADMIN_STAFF_EMAIL?.trim().toLowerCase();
+  return undefined;
 }
 
 async function migrateLegacyAdminEmails(
   accounts: StoredAdminAccount[]
 ): Promise<StoredAdminAccount[]> {
-  if (process.env.NODE_ENV !== "production") return accounts;
-
   let changed = false;
+  const isProduction = process.env.NODE_ENV === "production";
   const next = accounts.map((account) => {
-    if (account.id === "owner" && !account.email.includes("@")) {
-      const newEmail = resolveOwnerEmail(true);
+    if (account.id === "owner" && account.email === "owner") {
+      const newEmail = resolveOwnerEmail(isProduction);
       if (newEmail?.includes("@")) {
         changed = true;
         return { ...account, email: newEmail };
       }
     }
-    if (account.id === "staff" && !account.email.includes("@")) {
-      const newEmail = resolveStaffEmail(true);
+    if (account.id === "staff" && account.email === "staff") {
+      const newEmail = resolveStaffEmail(isProduction);
       if (newEmail?.includes("@")) {
         changed = true;
         return { ...account, email: newEmail };

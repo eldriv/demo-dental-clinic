@@ -144,10 +144,10 @@ function LoginForm() {
 
           {process.env.NODE_ENV === "development" && (
             <p className="mt-4 text-xs leading-relaxed text-muted">
-              Local dev only: use <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-[11px]">owner</code> /{" "}
-              <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-[11px]">staff</code> with{" "}
-              <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-[11px]">smilecare2026</code>
-              , or invited dentist emails.
+              Local dev: owner email and password from your <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-[11px]">.env</code>{" "}
+              (<code className="rounded bg-surface px-1.5 py-0.5 font-mono text-[11px]">ADMIN_OWNER_EMAIL</code> /{" "}
+              <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-[11px]">ADMIN_PASSWORD</code>).
+              Dentists use the email and password from their invite setup.
             </p>
           )}
         </div>
