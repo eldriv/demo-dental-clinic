@@ -25,16 +25,32 @@ function getOAuth2Client() {
   return oauth2Client;
 }
 
-function parseTimeToDate(date: string, time: string): { start: Date; end: Date } {
+function getClinicTimeZone(): string {
+  return process.env.CLINIC_TIMEZONE?.trim() || "Asia/Manila";
+}
+
+/** Wall-clock start/end for Google Calendar (no UTC conversion). */
+function parseBookingDateTime(
+  date: string,
+  time: string
+): { start: string; end: string } {
   const [timePart, period] = time.split(" ");
   const [hours, minutes] = timePart.split(":").map(Number);
   let hour = hours;
   if (period === "PM" && hour !== 12) hour += 12;
   if (period === "AM" && hour === 12) hour = 0;
 
-  const start = new Date(`${date}T${String(hour).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:00`);
-  const end = new Date(start.getTime() + 60 * 60 * 1000);
-  return { start, end };
+  const startMinutes = hour * 60 + minutes;
+  const endMinutes = startMinutes + 60;
+  const endHour = Math.floor(endMinutes / 60);
+  const endMin = endMinutes % 60;
+
+  const pad = (value: number) => String(value).padStart(2, "0");
+
+  return {
+    start: `${date}T${pad(hour)}:${pad(minutes)}:00`,
+    end: `${date}T${pad(endHour)}:${pad(endMin)}:00`,
+  };
 }
 
 function getCalendarDentistName(booking: Booking): string | undefined {
@@ -62,12 +78,14 @@ export function buildCalendarEventDescription(booking: Booking): string {
 }
 
 function buildCalendarEventBody(booking: Booking) {
-  const { start, end } = parseTimeToDate(booking.date, booking.time);
+  const { start, end } = parseBookingDateTime(booking.date, booking.time);
+  const timeZone = getClinicTimeZone();
+
   return {
     summary: buildCalendarEventSummary(booking),
     description: buildCalendarEventDescription(booking),
-    start: { dateTime: start.toISOString(), timeZone: "America/Toronto" },
-    end: { dateTime: end.toISOString(), timeZone: "America/Toronto" },
+    start: { dateTime: start, timeZone },
+    end: { dateTime: end, timeZone },
     location: site.location.full,
   };
 }
