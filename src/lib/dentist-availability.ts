@@ -1,6 +1,7 @@
 import type { Booking } from "./bookings";
 import type { ClinicOperatingSettings } from "./clinic-settings";
 import { generateTimeSlots, isOperatingDay, isValidTimeSlot, isAppointmentSlotInPast } from "./clinic-settings";
+import { getClinicTodayString } from "./clinic-timezone";
 import type { ClinicDentist } from "./dentists";
 import type { ScheduleBlock } from "./schedule-block-utils";
 import { isClinicWideDateBlocked, isDateBlocked } from "./schedule-block-utils";
@@ -239,10 +240,7 @@ export function validateDentistBooking(options: {
 }): string | null {
   const { date, time, dentistId, settings, bookings, blocks, dentists, excludeToken } = options;
 
-  const bookingDate = new Date(`${date}T12:00:00`);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  if (bookingDate < today) {
+  if (date < getClinicTodayString()) {
     return "Please select today or a future date.";
   }
 
@@ -305,10 +303,7 @@ export interface DentistSlotAvailability {
 }
 
 function toTodayString(from = new Date()): string {
-  const year = from.getFullYear();
-  const month = String(from.getMonth() + 1).padStart(2, "0");
-  const day = String(from.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return getClinicTodayString(from);
 }
 
 function findInProgressAppointment(

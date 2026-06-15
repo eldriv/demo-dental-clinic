@@ -2,6 +2,7 @@ import type { Booking } from "./bookings";
 import type { ClinicOperatingSettings } from "./clinic-settings";
 import type { ClinicDentist } from "./dentists";
 import type { ScheduleBlock } from "./schedule-block-utils";
+import { getClinicTodayString } from "./clinic-timezone";
 import { getTimeSlotOptionsForDentist } from "./dentist-availability";
 import { isOperatingDayClosed } from "./booking-availability";
 
@@ -20,8 +21,8 @@ export function toDateString(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export function getMinBookableDateString(from = new Date()): string {
-  return toDateString(from);
+export function getMinBookableDateString(now = new Date()): string {
+  return getClinicTodayString(now);
 }
 
 export function getDayBookingStatus(

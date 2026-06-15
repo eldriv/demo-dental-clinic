@@ -53,6 +53,8 @@ function formatTime12h(totalMinutes: number): string {
   return `${hours12}:${String(minutes).padStart(2, "0")} ${period}`;
 }
 
+import { getClinicNowMinutes, getClinicTodayString } from "./clinic-timezone";
+
 function toMinutes(time: string): number {
   const { hours, minutes } = parseTime12h(time);
   return hours * 60 + minutes;
@@ -64,13 +66,12 @@ export function isAppointmentSlotInPast(
   time: string,
   now = new Date()
 ): boolean {
-  const todayString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const todayString = getClinicTodayString(now);
   if (date < todayString) return true;
   if (date > todayString) return false;
 
   const slotMinutes = toMinutes(time);
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
-  return slotMinutes <= nowMinutes;
+  return slotMinutes <= getClinicNowMinutes(now);
 }
 
 export function generateTimeSlots(settings: ClinicOperatingSettings): string[] {
