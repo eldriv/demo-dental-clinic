@@ -6,6 +6,10 @@ import {
   completeBooking,
   declineBooking,
   reassignBookingDentist,
+  markBookingNoShow,
+  updateBookingInternalNotes,
+  updateBookingVisitNotes,
+  setBookingFollowUp,
 } from "@/lib/admin-bookings";
 import { getSiteUrlFromRequest } from "@/lib/site-url";
 
@@ -20,12 +24,16 @@ export async function POST(request: Request, { params }: RouteParams) {
   const { token: rawToken } = await params;
   const token = rawToken.trim();
   const siteUrl = getSiteUrlFromRequest(request);
+  const actor = session.name;
 
   try {
     const body = (await request.json()) as {
       action?: string;
       note?: string;
       assignedDentistId?: string;
+      internalNotes?: string;
+      visitNotes?: string;
+      followUpNeeded?: boolean;
     };
     const action = body.action;
 
@@ -33,6 +41,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       const result = await approveBooking(token, siteUrl, {
         assignedDentistId: body.assignedDentistId,
         requireDentist: true,
+        actor,
       });
       if (result.error) {
         return NextResponse.json({ error: result.error }, { status: 400 });
@@ -41,7 +50,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     }
 
     if (action === "decline") {
-      const result = await declineBooking(token, siteUrl, body.note);
+      const result = await declineBooking(token, siteUrl, body.note, { actor });
       if (result.error) {
         return NextResponse.json({ error: result.error }, { status: 400 });
       }
@@ -49,7 +58,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     }
 
     if (action === "complete") {
-      const result = await completeBooking(token);
+      const result = await completeBooking(token, { actor, visitNotes: body.visitNotes });
       if (result.error) {
         return NextResponse.json({ error: result.error }, { status: 400 });
       }
@@ -57,7 +66,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     }
 
     if (action === "cancel") {
-      const result = await cancelBookingAdmin(token, siteUrl);
+      const result = await cancelBookingAdmin(token, siteUrl, { actor });
       if (result.error) {
         return NextResponse.json({ error: result.error }, { status: 400 });
       }
@@ -66,7 +75,7 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     if (action === "confirm-attendance") {
       const { confirmPatientAttendance } = await import("@/lib/admin-bookings");
-      const result = await confirmPatientAttendance(token);
+      const result = await confirmPatientAttendance(token, { actor });
       if (result.error) {
         return NextResponse.json({ error: result.error }, { status: 400 });
       }
@@ -74,7 +83,39 @@ export async function POST(request: Request, { params }: RouteParams) {
     }
 
     if (action === "reassign-dentist") {
-      const result = await reassignBookingDentist(token, body.assignedDentistId ?? "");
+      const result = await reassignBookingDentist(token, body.assignedDentistId ?? "", { actor });
+      if (result.error) {
+        return NextResponse.json({ error: result.error }, { status: 400 });
+      }
+      return NextResponse.json({ success: true, booking: result.booking });
+    }
+
+    if (action === "mark-no-show") {
+      const result = await markBookingNoShow(token, { actor });
+      if (result.error) {
+        return NextResponse.json({ error: result.error }, { status: 400 });
+      }
+      return NextResponse.json({ success: true, booking: result.booking });
+    }
+
+    if (action === "update-internal-notes") {
+      const result = await updateBookingInternalNotes(token, body.internalNotes ?? "", { actor });
+      if (result.error) {
+        return NextResponse.json({ error: result.error }, { status: 400 });
+      }
+      return NextResponse.json({ success: true, booking: result.booking });
+    }
+
+    if (action === "update-visit-notes") {
+      const result = await updateBookingVisitNotes(token, body.visitNotes ?? "", { actor });
+      if (result.error) {
+        return NextResponse.json({ error: result.error }, { status: 400 });
+      }
+      return NextResponse.json({ success: true, booking: result.booking });
+    }
+
+    if (action === "set-follow-up") {
+      const result = await setBookingFollowUp(token, Boolean(body.followUpNeeded), { actor });
       if (result.error) {
         return NextResponse.json({ error: result.error }, { status: 400 });
       }

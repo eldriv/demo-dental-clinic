@@ -5,6 +5,10 @@ import type { ClinicDentist } from "./dentists";
 import type { ScheduleBlock } from "./schedule-block-utils";
 import { isClinicWideDateBlocked, isDateBlocked } from "./schedule-block-utils";
 import { isRescheduledPatient } from "./booking-status";
+import {
+  isAppointmentInProgress,
+  slotOverlapsAppointment,
+} from "./appointment-attendance";
 
 /** Patient chose any available dentist on the booking form. */
 export const ANY_DENTIST_ID = "any";
@@ -17,12 +21,16 @@ export function getBookingDentistId(booking: Booking): string | undefined {
   return booking.assignedDentistId ?? booking.preferredDentistId;
 }
 
-/** Committed on the dashboard schedule (approved visits). */
+/** Active visits that occupy the dentist schedule (not completed). */
 export function blocksDentistSchedule(booking: Booking): boolean {
-  if (booking.status === "completed") return true;
   if (booking.status === "confirmed") return true;
   if (booking.status === "rescheduled" && !booking.rescheduledByPatient) return true;
   return false;
+}
+
+/** Completed visit at this slot — show on calendar but do not block new bookings. */
+export function isCompletedScheduleBooking(booking: Booking): boolean {
+  return booking.status === "completed";
 }
 
 /** Holds a slot while awaiting approval (public booking guard). */
@@ -74,15 +82,23 @@ export function isSlotTakenForDentist(
   excludeToken?: string,
   mode: "booking" | "schedule" = "booking"
 ): boolean {
-  const holds = mode === "booking" ? holdsDentistSlotForBooking : blocksDentistSchedule;
+  if (mode === "schedule") {
+    return bookings.some(
+      (booking) =>
+        booking.date === date &&
+        booking.time === time &&
+        booking.token !== excludeToken &&
+        blocksDentistSchedule(booking) &&
+        bookingMatchesDentist(booking, dentistId)
+    );
+  }
 
   return bookings.some(
     (booking) =>
-      booking.date === date &&
-      booking.time === time &&
       booking.token !== excludeToken &&
-      holds(booking) &&
-      bookingMatchesDentist(booking, dentistId)
+      bookingMatchesDentist(booking, dentistId) &&
+      holdsDentistSlotForBooking(booking) &&
+      slotOverlapsAppointment(date, time, booking)
   );
 }
 
@@ -273,7 +289,14 @@ export function validateDentistBooking(options: {
   return null;
 }
 
-export type DentistSlotState = "open" | "booked" | "pending" | "blocked";
+export type DentistSlotState =
+  | "open"
+  | "booked"
+  | "pending"
+  | "blocked"
+  | "past"
+  | "in-operation"
+  | "completed";
 
 export interface DentistSlotAvailability {
   time: string;
@@ -281,19 +304,60 @@ export interface DentistSlotAvailability {
   booking?: Booking;
 }
 
+function toTodayString(from = new Date()): string {
+  const year = from.getFullYear();
+  const month = String(from.getMonth() + 1).padStart(2, "0");
+  const day = String(from.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function findInProgressAppointment(
+  bookings: Booking[],
+  date: string,
+  time: string,
+  dentistId: string,
+  now = new Date()
+): Booking | undefined {
+  if (date !== toTodayString(now)) return undefined;
+
+  return bookings.find(
+    (booking) =>
+      booking.date === date &&
+      bookingMatchesDentist(booking, dentistId) &&
+      blocksDentistSchedule(booking) &&
+      booking.status !== "completed" &&
+      isAppointmentInProgress(booking, now) &&
+      slotOverlapsAppointment(date, time, booking)
+  );
+}
+
 export function getDentistDayAvailability(
   bookings: Booking[],
   blocks: ScheduleBlock[],
   date: string,
   timeSlots: string[],
-  dentistId: string
+  dentistId: string,
+  now = new Date()
 ): DentistSlotAvailability[] {
   const clinicBlocked = isClinicWideDateBlocked(date, blocks);
   const onLeave = isDentistOnLeave(date, dentistId, blocks);
+  const isPastDay = date < toTodayString(now);
 
   return timeSlots.map((time) => {
     if (clinicBlocked || onLeave) {
       return { time, state: "blocked" as const };
+    }
+
+    const completedBooking = bookings.find(
+      (booking) =>
+        booking.date === date &&
+        booking.time === time &&
+        isCompletedScheduleBooking(booking) &&
+        bookingMatchesDentist(booking, dentistId)
+    );
+
+    if (completedBooking) {
+      return { time, state: "completed" as const, booking: completedBooking };
     }
 
     const approved = bookings.find(
@@ -305,6 +369,9 @@ export function getDentistDayAvailability(
     );
 
     if (approved) {
+      if (isAppointmentInProgress(approved, now)) {
+        return { time, state: "in-operation" as const, booking: approved };
+      }
       return { time, state: "booked" as const, booking: approved };
     }
 
@@ -319,7 +386,19 @@ export function getDentistDayAvailability(
     );
 
     if (pending) {
+      if (!isPastDay && isAppointmentSlotInPast(date, time, now)) {
+        return { time, state: "past" as const, booking: pending };
+      }
       return { time, state: "pending" as const, booking: pending };
+    }
+
+    const inSession = findInProgressAppointment(bookings, date, time, dentistId, now);
+    if (inSession) {
+      return { time, state: "in-operation" as const, booking: inSession };
+    }
+
+    if (isPastDay || isAppointmentSlotInPast(date, time, now)) {
+      return { time, state: "past" as const };
     }
 
     return { time, state: "open" as const };

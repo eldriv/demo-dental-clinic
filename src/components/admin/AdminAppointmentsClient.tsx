@@ -83,10 +83,10 @@ export function AdminAppointmentsPageClient({
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <AdminPageHeader
         title="Appointments"
-        description="Review requests, assign dentists, and manage patient visits."
+        description="Tap a row to expand. Use Done for quick complete."
       />
 
       <div className="admin-segment">
@@ -107,7 +107,7 @@ export function AdminAppointmentsPageClient({
       {filtered.length === 0 ? (
         <AdminEmptyState message="No appointments in this view." />
       ) : (
-        <div className="grid gap-4">
+        <div className="grid gap-2">
           {filtered.map((booking) => (
             <AppointmentCard key={booking.token} booking={booking} onUpdated={handleUpdated} />
           ))}

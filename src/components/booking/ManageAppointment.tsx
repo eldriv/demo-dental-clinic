@@ -14,6 +14,7 @@ import {
   formatLateNoticeSummary,
   isActiveAppointment,
 } from "@/lib/appointment-attendance";
+import { getTodayDateString } from "@/lib/admin-booking-filters";
 
 interface ManageAppointmentProps {
   initialBooking: Booking;
@@ -169,10 +170,39 @@ export function ManageAppointment({ initialBooking }: ManageAppointmentProps) {
     }
   }
 
+  async function handleCheckIn() {
+    setStatus("loading");
+    setMessage("");
+
+    try {
+      const res = await fetch(`/api/bookings/${bookingData.token}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "check-in" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setStatus("error");
+        setMessage(data.error ?? "Check-in failed.");
+        return;
+      }
+      setBookingData(data.booking);
+      setStatus("success");
+      setMessage(data.message ?? "You're checked in.");
+    } catch {
+      setStatus("error");
+      setMessage(`Unable to check in. Please tell the front desk or call ${site.contact.phones[0]}.`);
+    }
+  }
+
   const isCancelled = bookingData.status === "cancelled";
   const isCompleted = bookingData.status === "completed";
   const canManage = !isCancelled && !isCompleted;
   const canLateNotice = canReportLateArrival(bookingData);
+  const canCheckIn =
+    isActiveAppointment(bookingData) &&
+    bookingData.date === getTodayDateString() &&
+    !bookingData.checkedInAt;
   const showLateBanner = Boolean(bookingData.lateNoticeAt) && isActiveAppointment(bookingData);
   const hasAvailableSlot = timeSlots.some((slot) => slot.available);
   const cannotPickTime =
@@ -223,7 +253,13 @@ export function ManageAppointment({ initialBooking }: ManageAppointmentProps) {
 
       {(bookingData.status === "pending" || isRescheduledPatient(bookingData)) && (
         <p className="mb-6 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Your request is awaiting clinic approval. You&apos;ll receive a confirmation email once approved.
+          Your request is awaiting clinic approval. We&apos;ll confirm your new time by email — usually within a few hours during clinic hours.
+        </p>
+      )}
+
+      {bookingData.checkedInAt && (
+        <p className="mb-6 rounded-xl bg-green-50 px-4 py-3 text-sm text-green-800">
+          You&apos;re checked in. Please have a seat — we&apos;ll call you shortly.
         </p>
       )}
 
@@ -276,6 +312,16 @@ export function ManageAppointment({ initialBooking }: ManageAppointmentProps) {
 
       {canManage && mode === "view" && (
         <div className="mt-8 flex flex-wrap gap-3">
+          {canCheckIn && (
+            <button
+              type="button"
+              onClick={handleCheckIn}
+              disabled={status === "loading"}
+              className="btn-cta flex-1"
+            >
+              {status === "loading" ? <Loader2 className="size-4 animate-spin" /> : "I've arrived — check in"}
+            </button>
+          )}
           {canLateNotice && !bookingData.lateNoticeAt && (
             <button
               type="button"

@@ -4,10 +4,6 @@ import {
   sendCancellationEmails,
   sendRescheduleEmails,
 } from "@/lib/email";
-import {
-  updateCalendarEvent,
-  deleteCalendarEvent,
-} from "@/lib/calendar";
 import { getSiteUrlFromRequest } from "@/lib/site-url";
 import { site } from "@/content";
 import { getClinicSettings } from "@/lib/clinic-settings-store";
@@ -18,6 +14,7 @@ import { ANY_DENTIST_ID, validateSlotBooking } from "@/lib/booking-availability"
 import { isAnyDentist } from "@/lib/dentist-availability";
 import { canReportLateArrival, isActiveAppointment } from "@/lib/appointment-attendance";
 import { sendLateNoticeEmails } from "@/lib/email";
+import { patientCheckIn } from "@/lib/admin-bookings";
 
 interface RouteParams {
   params: Promise<{ token: string }>;
@@ -59,10 +56,6 @@ export async function POST(request: Request, { params }: RouteParams) {
       const updated = await updateBooking(token, { status: "cancelled" });
       if (!updated) {
         return NextResponse.json({ error: "Failed to cancel." }, { status: 500 });
-      }
-
-      if (updated.calendarEventId) {
-        await deleteCalendarEvent(updated.calendarEventId);
       }
 
       await sendCancellationEmails(updated, siteUrl);
@@ -132,7 +125,6 @@ export async function POST(request: Request, { params }: RouteParams) {
         return NextResponse.json({ error: "Failed to reschedule." }, { status: 500 });
       }
 
-      await updateCalendarEvent(updated);
       await sendRescheduleEmails(updated, siteUrl);
 
       return NextResponse.json({
@@ -180,6 +172,18 @@ export async function POST(request: Request, { params }: RouteParams) {
         success: true,
         message: "Thanks — we've notified the clinic that you're running late.",
         booking: updated,
+      });
+    }
+
+    if (body.action === "check-in") {
+      const result = await patientCheckIn(token);
+      if (result.error) {
+        return NextResponse.json({ error: result.error }, { status: 400 });
+      }
+      return NextResponse.json({
+        success: true,
+        message: "You're checked in. Please have a seat — we'll call you shortly.",
+        booking: result.booking,
       });
     }
 

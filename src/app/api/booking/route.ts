@@ -86,6 +86,7 @@ export async function POST(request: Request) {
       date: body.date,
       time: body.time,
       status: "pending",
+      source: "web",
       createdAt: now,
       updatedAt: now,
       ...(preferredDentist

@@ -295,6 +295,48 @@ export function isEmailConfigured(): boolean {
   return isSmtpConfigured();
 }
 
+export async function sendAppointmentReminderEmail(
+  booking: Booking,
+  kind: "24h" | "2h",
+  siteUrl?: string
+): Promise<{ sent: boolean; error?: string }> {
+  if (!isSmtpConfigured()) {
+    return { sent: false, error: "SMTP not configured" };
+  }
+
+  const baseUrl = siteUrl ?? getSiteUrl();
+  const transporter = createTransporter();
+  const manageUrl = buildManageUrl(booking.token, baseUrl);
+  const when =
+    kind === "24h"
+      ? "tomorrow"
+      : "in about 2 hours";
+
+  try {
+    await transporter.sendMail({
+      from: `"${site.name}" <${process.env.SMTP_USER}>`,
+      to: booking.email,
+      subject:
+        kind === "24h"
+          ? `Reminder: appointment tomorrow — ${site.name}`
+          : `Reminder: appointment today — ${site.name}`,
+      text: `Dear ${booking.name},\n\nThis is a reminder that your appointment is ${when}.\n\n${formatBookingDetails(booking)}\n\nManage: ${manageUrl}\n\nThank you,\n${site.name}`,
+      html: buildBrandedEmail({
+        heading: kind === "24h" ? "Appointment Tomorrow" : "Appointment Today",
+        intro: `Hi ${booking.name}, your ${booking.service} appointment is ${when}.`,
+        rows: bookingDetailRows(booking),
+        cta: { label: "Manage or check in", href: manageUrl, color: "primary" },
+        footerNote: "Running late? Use the manage link to notify the front desk.",
+      }),
+    });
+
+    return { sent: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Email send failed";
+    return { sent: false, error: message };
+  }
+}
+
 /** @deprecated Use sendBookingRequestEmails or sendBookingApprovedEmail */
 export async function sendBookingConfirmationEmails(
   booking: Booking,

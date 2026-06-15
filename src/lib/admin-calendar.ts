@@ -206,9 +206,17 @@ export function countOpenSlots(availability: SlotAvailability[]): number {
 }
 
 export function countBookedSlots(availability: SlotAvailability[]): number {
-  return availability.filter((slot) => slot.state === "booked").length;
+  return availability.filter((slot) => slot.state === "booked" || slot.state === "in-operation").length;
+}
+
+export function countCompletedSlots(availability: SlotAvailability[]): number {
+  return availability.filter((slot) => slot.state === "completed").length;
 }
 
 export function countPendingSlots(availability: SlotAvailability[]): number {
   return availability.filter((slot) => slot.state === "pending").length;
+}
+
+export function countInOperationSlots(availability: SlotAvailability[]): number {
+  return availability.filter((slot) => slot.state === "in-operation").length;
 }

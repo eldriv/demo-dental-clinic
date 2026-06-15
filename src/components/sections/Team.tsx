@@ -1,10 +1,24 @@
 import { team, teamPlaceholder } from "@/content";
+import { getAllDentists } from "@/lib/dentists-store";
 import { AccentHeading } from "@/components/ui/AccentHeading";
 import { FadeIn } from "@/components/ui/FadeIn";
 import { ImagePlaceholder } from "@/components/ui/ImagePlaceholder";
 import { SectionLabel } from "@/components/ui/SectionLabel";
 
-export function Team() {
+export async function Team() {
+  const dentists = await getAllDentists();
+  const staticById = new Map(team.members.map((member) => [member.id, member]));
+
+  const members = dentists.map((dentist) => {
+    const staticMember = staticById.get(dentist.id);
+    return {
+      id: dentist.id,
+      name: dentist.name,
+      role: staticMember?.role ?? "Dentist",
+      bio: staticMember?.bio ?? "Comprehensive dental care with a focus on patient comfort.",
+    };
+  });
+
   return (
     <section id="team" className="section-padding page-x">
       <div className="section-inner">
@@ -21,24 +35,24 @@ export function Team() {
         </FadeIn>
 
         <div className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-          {team.members.map((member, i) => {
+          {members.map((member, i) => {
             const portrait = teamPlaceholder(member.id, member.name);
 
             return (
-            <FadeIn key={member.id} delay={i * 100}>
-              <div className="card text-center">
-                <ImagePlaceholder
-                  label={portrait.label}
-                  src={portrait.src}
-                  aspectRatio="aspect-square"
-                  className="mx-auto mb-5 max-w-[200px]"
-                  rounded="full"
-                />
-                <h3 className="text-lg font-semibold text-dark">{member.name}</h3>
-                <p className="mt-1 text-sm font-medium text-primary">{member.role}</p>
-                <p className="mt-3 text-sm leading-relaxed text-muted">{member.bio}</p>
-              </div>
-            </FadeIn>
+              <FadeIn key={member.id} delay={i * 100}>
+                <div className="card text-center">
+                  <ImagePlaceholder
+                    label={portrait.label}
+                    src={portrait.src}
+                    aspectRatio="aspect-square"
+                    className="mx-auto mb-5 max-w-[200px]"
+                    rounded="full"
+                  />
+                  <h3 className="text-lg font-semibold text-dark">{member.name}</h3>
+                  <p className="mt-1 text-sm font-medium text-primary">{member.role}</p>
+                  <p className="mt-3 text-sm leading-relaxed text-muted">{member.bio}</p>
+                </div>
+              </FadeIn>
             );
           })}
         </div>

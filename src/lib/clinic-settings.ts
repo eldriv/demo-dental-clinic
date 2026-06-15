@@ -29,6 +29,8 @@ export const DEFAULT_CLINIC_SETTINGS: ClinicOperatingSettings = {
 
 const APPOINTMENT_DURATION_MINUTES = 60;
 
+export { APPOINTMENT_DURATION_MINUTES };
+
 function parseTime12h(time: string): { hours: number; minutes: number } {
   const [timePart, period] = time.trim().split(/\s+/);
   const [rawHours, rawMinutes] = timePart.split(":").map(Number);
@@ -63,7 +65,8 @@ export function isAppointmentSlotInPast(
   now = new Date()
 ): boolean {
   const todayString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-  if (date !== todayString) return false;
+  if (date < todayString) return true;
+  if (date > todayString) return false;
 
   const slotMinutes = toMinutes(time);
   const nowMinutes = now.getHours() * 60 + now.getMinutes();

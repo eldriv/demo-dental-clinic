@@ -1,9 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Calendar, Loader2, Mail, Phone, Stethoscope, AlertTriangle } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronDown,
+  ExternalLink,
+  Flag,
+  Loader2,
+  Mail,
+  MoreHorizontal,
+  Phone,
+  Stethoscope,
+  AlertTriangle,
+  UserCheck,
+} from "lucide-react";
 import type { Booking } from "@/lib/bookings";
-import { StatusBadge, formatBookingWhen } from "@/components/admin/StatusBadge";
+import { getBookingSource } from "@/lib/bookings";
+import { StatusBadge } from "@/components/admin/StatusBadge";
 import { useAdminDentists } from "@/components/admin/useAdminDentists";
 import { needsStaffApproval } from "@/lib/booking-status";
 import {
@@ -11,67 +24,86 @@ import {
   needsNoShowAlert,
 } from "@/lib/appointment-attendance";
 
-interface AppointmentActionsProps {
+type ActionName =
+  | "approve"
+  | "decline"
+  | "complete"
+  | "cancel"
+  | "confirm-attendance"
+  | "reassign-dentist"
+  | "mark-no-show"
+  | "update-internal-notes"
+  | "set-follow-up";
+
+function ActionButton({
+  children,
+  onClick,
+  disabled,
+  variant = "outline",
+  loading,
+  className = "",
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  variant?: "primary" | "outline" | "danger";
+  loading?: boolean;
+  className?: string;
+}) {
+  const base =
+    variant === "primary"
+      ? "btn-cta btn-cta-sm"
+      : variant === "danger"
+        ? "btn-outline btn-cta-sm btn-outline-danger"
+        : "btn-outline btn-cta-sm";
+
+  return (
+    <button
+      type="button"
+      disabled={disabled || loading}
+      onClick={onClick}
+      className={`${base} ${className}`}
+    >
+      {loading ? <Loader2 className="size-3.5 animate-spin" /> : children}
+    </button>
+  );
+}
+
+function AlertChip({ children, tone }: { children: React.ReactNode; tone: "amber" | "green" | "blue" }) {
+  const tones = {
+    amber: "bg-amber-100 text-amber-900",
+    green: "bg-green-100 text-green-800",
+    blue: "bg-blue-100 text-blue-800",
+  };
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${tones[tone]}`}>
+      {children}
+    </span>
+  );
+}
+
+interface AppointmentCardProps {
   booking: Booking;
   onUpdated: (booking: Booking) => void;
 }
 
-export function AppointmentActions({ booking, onUpdated }: AppointmentActionsProps) {
+export function AppointmentCard({ booking, onUpdated }: AppointmentCardProps) {
   const { dentists, loading: dentistsLoading } = useAdminDentists();
-  const [loading, setLoading] = useState<string | null>(null);
-  const [note, setNote] = useState("");
+  const showNoShowAlert = needsNoShowAlert(booking);
+  const canApprove = needsStaffApproval(booking);
+  const [expanded, setExpanded] = useState(canApprove || showNoShowAlert);
+  const [loading, setLoading] = useState<ActionName | null>(null);
+  const [declineNote, setDeclineNote] = useState("");
+  const [internalNotes, setInternalNotes] = useState(booking.internalNotes ?? "");
+  const [showDeclineForm, setShowDeclineForm] = useState(false);
   const [assignedDentistId, setAssignedDentistId] = useState(
     booking.assignedDentistId ?? booking.preferredDentistId ?? dentists[0]?.id ?? ""
   );
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    const next =
-      booking.assignedDentistId ?? booking.preferredDentistId ?? dentists[0]?.id ?? "";
-    if (next && next !== assignedDentistId) {
-      setAssignedDentistId(next);
-    }
-  }, [booking.assignedDentistId, booking.preferredDentistId, dentists, assignedDentistId]);
-
-  async function runAction(
-    action: "approve" | "decline" | "complete" | "cancel" | "confirm-attendance" | "reassign-dentist"
-  ) {
-    if (action === "cancel") {
-      const confirmed = window.confirm(
-        `Cancel the appointment for ${booking.name} on ${booking.date} at ${booking.time}? The time slot will be freed on the website immediately.`
-      );
-      if (!confirmed) return;
-    }
-
-    setLoading(action);
-    setError("");
-
-    try {
-      const payload: Record<string, string | undefined> = { action, note: note.trim() || undefined };
-      if (action === "approve" || action === "reassign-dentist") {
-        payload.assignedDentistId = assignedDentistId;
-      }
-
-      const res = await fetch(`/api/admin/bookings/${booking.token}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Action failed.");
-        return;
-      }
-      onUpdated(data.booking);
-      setNote("");
-    } catch {
-      setError("Action failed.");
-    } finally {
-      setLoading(null);
-    }
-  }
-
-  const canApprove = needsStaffApproval(booking);
+  const dentistLabel =
+    booking.assignedDentistName ?? booking.preferredDentistName ?? null;
+  const source = getBookingSource(booking);
   const canReassignDentist =
     !canApprove &&
     booking.status !== "cancelled" &&
@@ -85,261 +117,338 @@ export function AppointmentActions({ booking, onUpdated }: AppointmentActionsPro
     booking.status === "confirmed" || booking.status === "rescheduled";
   const canCancel =
     booking.status !== "cancelled" && booking.status !== "completed";
-  const showNoShowAlert = needsNoShowAlert(booking);
-  const canConfirmAttendance = showNoShowAlert;
+  const canMarkNoShow =
+    showNoShowAlert && booking.status !== "cancelled" && booking.status !== "completed";
+
+  useEffect(() => {
+    setInternalNotes(booking.internalNotes ?? "");
+  }, [booking.internalNotes]);
+
+  useEffect(() => {
+    const next =
+      booking.assignedDentistId ?? booking.preferredDentistId ?? dentists[0]?.id ?? "";
+    if (next && next !== assignedDentistId) setAssignedDentistId(next);
+  }, [booking.assignedDentistId, booking.preferredDentistId, dentists, assignedDentistId]);
+
+  async function runAction(
+    action: ActionName,
+    extra: Record<string, string | boolean | undefined> = {}
+  ) {
+    if (action === "cancel") {
+      const confirmed = window.confirm(
+        `Cancel ${booking.name}'s appointment on ${booking.date} at ${booking.time}?`
+      );
+      if (!confirmed) return;
+    }
+
+    setLoading(action);
+    setError("");
+
+    try {
+      const payload: Record<string, string | boolean | undefined> = { action, ...extra };
+      if (action === "decline") payload.note = declineNote.trim() || undefined;
+      if (action === "approve" || action === "reassign-dentist") {
+        payload.assignedDentistId = assignedDentistId;
+      }
+      if (action === "update-internal-notes") payload.internalNotes = internalNotes;
+
+      const res = await fetch(`/api/admin/bookings/${booking.token}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Action failed.");
+        return;
+      }
+      onUpdated(data.booking);
+      if (action === "decline") {
+        setDeclineNote("");
+        setShowDeclineForm(false);
+      }
+    } catch {
+      setError("Action failed.");
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  const chips = [
+    booking.followUpNeeded && { key: "fu", tone: "amber" as const, label: "Follow-up", icon: Flag },
+    booking.checkedInAt && { key: "in", tone: "green" as const, label: "Checked in", icon: UserCheck },
+    showNoShowAlert && { key: "ns", tone: "amber" as const, label: "No-show risk", icon: AlertTriangle },
+    booking.lateNoticeAt && { key: "late", tone: "blue" as const, label: "Late", icon: null },
+    booking.rescheduledByPatient && { key: "rs", tone: "blue" as const, label: "Rescheduled", icon: null },
+  ].filter(Boolean) as Array<{
+    key: string;
+    tone: "amber" | "green" | "blue";
+    label: string;
+    icon: typeof Flag | null;
+  }>;
 
   return (
-    <div className="space-y-4 border-t border-gray-100 pt-4">
-      {canApprove && (
-        <div>
-          <label htmlFor={`dentist-${booking.token}`} className="admin-detail-label">
-            Assign dentist
-          </label>
-          {dentistsLoading ? (
-            <p className="mt-1 text-sm text-muted">Loading dentists…</p>
-          ) : dentists.length > 0 ? (
-            <select
-              id={`dentist-${booking.token}`}
-              value={assignedDentistId}
-              onChange={(e) => setAssignedDentistId(e.target.value)}
-              className="input-field mt-1.5 text-sm"
-              required
+    <article className={`admin-appt-compact ${expanded ? "admin-appt-compact-open" : ""}`}>
+      {/* Collapsed row — always visible */}
+      <div className="admin-appt-compact-head">
+        <button
+          type="button"
+          className="admin-appt-compact-toggle"
+          onClick={() => setExpanded((open) => !open)}
+          aria-expanded={expanded}
+        >
+          <span className="admin-appt-time">{booking.time}</span>
+          <span className="min-w-0 flex-1 text-left">
+            <span className="block truncate text-sm font-semibold text-dark">{booking.name}</span>
+            <span className="block truncate text-xs text-muted">
+              {booking.service}
+              {dentistLabel ? ` · ${dentistLabel}` : ""}
+              {source === "staff" ? " · Walk-in" : ""}
+            </span>
+          </span>
+          <ChevronDown
+            className={`size-4 shrink-0 text-muted transition-transform ${expanded ? "rotate-180" : ""}`}
+          />
+        </button>
+
+        <StatusBadge booking={booking} compact />
+
+        <div className="admin-appt-compact-actions">
+          {canComplete && !expanded && (
+            <ActionButton
+              variant="primary"
+              loading={loading === "complete"}
+              onClick={() => runAction("complete")}
+              className="px-2.5! py-1! text-xs"
             >
-              <option value="">Select dentist</option>
-              {dentists.map((dentist) => (
-                <option key={dentist.id} value={dentist.id}>
-                  {dentist.name}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <p className="mt-1 text-sm text-red-600">
-              No dentists yet.{" "}
-              <a href="/admin/dentists" className="text-primary underline">
-                Add dentists
-              </a>{" "}
-              first.
+              Done
+            </ActionButton>
+          )}
+          {canApprove && !expanded && (
+            <ActionButton
+              variant="primary"
+              loading={loading === "approve"}
+              disabled={dentistsLoading || !assignedDentistId}
+              onClick={() => setExpanded(true)}
+              className="px-2.5! py-1! text-xs"
+            >
+              Review
+            </ActionButton>
+          )}
+          <a
+            href={`tel:${booking.phone.replace(/[^\d+]/g, "")}`}
+            className="admin-appt-icon-btn"
+            title="Call"
+          >
+            <Phone className="size-3.5" />
+          </a>
+          <button
+            type="button"
+            className="admin-appt-icon-btn"
+            title={expanded ? "Less" : "More"}
+            onClick={() => setExpanded((open) => !open)}
+          >
+            <MoreHorizontal className="size-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {chips.length > 0 && (
+        <div className="admin-appt-chips">
+          {chips.map((chip) => (
+            <AlertChip key={chip.key} tone={chip.tone}>
+              {chip.icon && <chip.icon className="size-2.5" />}
+              {chip.label}
+            </AlertChip>
+          ))}
+        </div>
+      )}
+
+      {/* Expanded panel */}
+      {expanded && (
+        <div className="admin-appt-expanded">
+          <div className="admin-appt-meta text-xs text-muted">
+            <span>{booking.date}</span>
+            <span>·</span>
+            <a href={`tel:${booking.phone.replace(/[^\d+]/g, "")}`} className="text-primary hover:underline">
+              {booking.phone}
+            </a>
+            <span>·</span>
+            <a href={`mailto:${booking.email}`} className="truncate text-primary hover:underline">
+              {booking.email}
+            </a>
+            {dentistLabel && (
+              <>
+                <span>·</span>
+                <span className="inline-flex items-center gap-1">
+                  <Stethoscope className="size-3" />
+                  {dentistLabel}
+                </span>
+              </>
+            )}
+          </div>
+
+          {booking.internalNotes && (
+            <p className="text-xs text-amber-900 bg-amber-50 rounded-lg px-2 py-1.5">
+              Note: {booking.internalNotes}
             </p>
           )}
-        </div>
-      )}
 
-      {canReassignDentist && (
-        <div>
-          <label htmlFor={`reassign-dentist-${booking.token}`} className="admin-detail-label">
-            Assigned dentist
-          </label>
-          {dentistsLoading ? (
-            <p className="mt-1 text-sm text-muted">Loading dentists…</p>
-          ) : dentists.length > 0 ? (
-            <div className="mt-1.5 flex flex-col gap-2 sm:flex-row sm:items-center">
-              <select
-                id={`reassign-dentist-${booking.token}`}
-                value={assignedDentistId}
-                onChange={(e) => setAssignedDentistId(e.target.value)}
-                className="input-field flex-1 text-sm"
-              >
-                {dentists.map((dentist) => (
-                  <option key={dentist.id} value={dentist.id}>
-                    {dentist.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                disabled={
-                  !!loading ||
-                  dentistsLoading ||
-                  !assignedDentistId ||
-                  assignedDentistId === booking.assignedDentistId
-                }
-                onClick={() => runAction("reassign-dentist")}
-                className="btn-outline btn-cta-sm shrink-0"
-              >
-                {loading === "reassign-dentist" ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  "Update dentist"
-                )}
-              </button>
-            </div>
-          ) : (
-            <p className="mt-1 text-sm text-muted">No dentists available.</p>
+          {showNoShowAlert && (
+            <p className="text-xs text-amber-900">30+ min past start — contact patient.</p>
           )}
-        </div>
-      )}
+          {booking.lateNoticeAt && (
+            <p className="text-xs text-blue-900">{formatLateNoticeSummary(booking)}</p>
+          )}
 
-      {canDecline && (
-        <textarea
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="Optional note for patient (why reschedule is needed)"
-          rows={2}
-          className="input-field text-sm"
-        />
-      )}
+          {canApprove && (
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="min-w-[140px] flex-1">
+                <label htmlFor={`dentist-${booking.token}`} className="admin-detail-label text-[10px]">
+                  Dentist
+                </label>
+                <select
+                  id={`dentist-${booking.token}`}
+                  value={assignedDentistId}
+                  onChange={(e) => setAssignedDentistId(e.target.value)}
+                  className="input-field mt-0.5 py-1.5 text-xs"
+                >
+                  <option value="">Select</option>
+                  {dentists.map((d) => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+              </div>
+              <ActionButton variant="primary" loading={loading === "approve"} disabled={!assignedDentistId} onClick={() => runAction("approve")}>
+                Approve
+              </ActionButton>
+              {canDecline && !showDeclineForm && (
+                <ActionButton variant="outline" onClick={() => setShowDeclineForm(true)}>
+                  Reschedule
+                </ActionButton>
+              )}
+            </div>
+          )}
 
-      <div className="admin-actions-bar">
-        {canConfirmAttendance && (
-          <button
-            type="button"
-            disabled={!!loading}
-            onClick={() => runAction("confirm-attendance")}
-            className="btn-cta btn-cta-sm"
-          >
-            {loading === "confirm-attendance" ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              "Patient still coming"
+          {showDeclineForm && (
+            <div className="space-y-2 rounded-lg border border-amber-100 bg-amber-50/80 p-2">
+              <textarea
+                value={declineNote}
+                onChange={(e) => setDeclineNote(e.target.value)}
+                placeholder="Optional note for patient"
+                rows={2}
+                className="input-field text-xs"
+              />
+              <div className="flex flex-wrap gap-1.5">
+                <ActionButton variant="danger" loading={loading === "decline"} onClick={() => runAction("decline")}>
+                  Send
+                </ActionButton>
+                <ActionButton variant="outline" onClick={() => setShowDeclineForm(false)}>
+                  Cancel
+                </ActionButton>
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-1.5">
+            {showNoShowAlert && (
+              <>
+                <ActionButton variant="primary" loading={loading === "confirm-attendance"} onClick={() => runAction("confirm-attendance")}>
+                  Still coming
+                </ActionButton>
+                {canMarkNoShow && (
+                  <ActionButton variant="danger" loading={loading === "mark-no-show"} onClick={() => runAction("mark-no-show")}>
+                    No-show
+                  </ActionButton>
+                )}
+              </>
             )}
-          </button>
-        )}
-        {canApprove && (
-          <button
-            type="button"
-            disabled={!!loading || dentistsLoading || !assignedDentistId}
-            onClick={() => runAction("approve")}
-            className="btn-cta btn-cta-sm"
-          >
-            {loading === "approve" ? <Loader2 className="size-4 animate-spin" /> : "Approve"}
-          </button>
-        )}
-        {canDecline && (
-          <button
-            type="button"
-            disabled={!!loading}
-            onClick={() => runAction("decline")}
-            className="btn-outline btn-cta-sm btn-outline-danger"
-          >
-            {loading === "decline" ? <Loader2 className="size-4 animate-spin" /> : "Not Available"}
-          </button>
-        )}
-        {canComplete && (
-          <button
-            type="button"
-            disabled={!!loading}
-            onClick={() => runAction("complete")}
-            className="btn-outline btn-cta-sm"
-          >
-            {loading === "complete" ? <Loader2 className="size-4 animate-spin" /> : "Mark Completed"}
-          </button>
-        )}
-        {canCancel && (
-          <button
-            type="button"
-            disabled={!!loading}
-            onClick={() => runAction("cancel")}
-            className="btn-outline btn-cta-sm btn-outline-danger"
-          >
-            {loading === "cancel" ? <Loader2 className="size-4 animate-spin" /> : "Cancel & free slot"}
-          </button>
-        )}
-        <a
-          href={`/manage/${booking.token}`}
-          target="_blank"
-          rel="noreferrer"
-          className="btn-outline btn-cta-sm"
-        >
-          Patient View
-        </a>
-      </div>
-
-      {error && <p className="text-sm text-red-600">{error}</p>}
-    </div>
-  );
-}
-
-interface AppointmentCardProps {
-  booking: Booking;
-  onUpdated: (booking: Booking) => void;
-}
-
-export function AppointmentCard({ booking, onUpdated }: AppointmentCardProps) {
-  const dentistLabel =
-    booking.assignedDentistName ??
-    booking.preferredDentistName ??
-    (booking.preferredDentistId || booking.assignedDentistId
-      ? booking.preferredDentistId ?? booking.assignedDentistId
-      : null);
-  const showNoShowAlert = needsNoShowAlert(booking);
-
-  return (
-    <article className="admin-card transition-shadow hover:shadow-[0_12px_40px_rgba(26,60,52,0.08)]">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="text-lg font-semibold tracking-tight text-dark">{booking.name}</h3>
-          <p className="mt-0.5 text-sm text-muted">{booking.service}</p>
-        </div>
-        <StatusBadge booking={booking} />
-      </div>
-
-      {showNoShowAlert && (
-        <div className="admin-info-banner admin-info-banner-amber mt-4">
-          <AlertTriangle className="size-4 shrink-0" />
-          <p>Past 30-minute threshold — contact the patient to confirm if they&apos;re still coming.</p>
-        </div>
-      )}
-
-      {booking.lateNoticeAt && (
-        <div className="admin-info-banner admin-info-banner-blue mt-4">
-          <p>{formatLateNoticeSummary(booking)}</p>
-        </div>
-      )}
-
-      {booking.attendanceConfirmed && (
-        <div className="mt-4 rounded-xl bg-green-50 px-3 py-2 text-sm text-green-800">
-          Reception confirmed patient is still attending.
-        </div>
-      )}
-
-      {booking.rescheduledByPatient && (
-        <div className="admin-info-banner admin-info-banner-blue mt-4">
-          <p>This patient picked a new date/time. Review and approve the updated appointment.</p>
-        </div>
-      )}
-
-      <div className="admin-detail-grid mt-4">
-        <div className="admin-detail-item">
-          <dt className="admin-detail-label flex items-center gap-1.5">
-            <Calendar className="size-3.5" />
-            When
-          </dt>
-          <dd className="admin-detail-value">{formatBookingWhen(booking)}</dd>
-        </div>
-        <div className="admin-detail-item">
-          <dt className="admin-detail-label flex items-center gap-1.5">
-            <Phone className="size-3.5" />
-            Phone
-          </dt>
-          <dd className="admin-detail-value">{booking.phone}</dd>
-        </div>
-        {dentistLabel && (
-          <div className="admin-detail-item">
-            <dt className="admin-detail-label flex items-center gap-1.5">
-              <Stethoscope className="size-3.5" />
-              Dentist
-            </dt>
-            <dd className="admin-detail-value">
-              {dentistLabel}
-              {!booking.assignedDentistId && booking.preferredDentistName && (
-                <span className="ml-1 text-xs font-normal text-muted">(preferred)</span>
-              )}
-              {!booking.assignedDentistId && !booking.preferredDentistName && !booking.preferredDentistId && (
-                <span className="ml-1 text-xs font-normal text-muted">(any doctor)</span>
-              )}
-            </dd>
+            {canComplete && (
+              <ActionButton variant="primary" loading={loading === "complete"} onClick={() => runAction("complete")}>
+                <CheckCircle2 className="mr-1 inline size-3.5" />
+                Complete
+              </ActionButton>
+            )}
+            {!canApprove && canDecline && !showDeclineForm && (
+              <ActionButton variant="outline" onClick={() => setShowDeclineForm(true)}>
+                Reschedule
+              </ActionButton>
+            )}
+            {canReassignDentist && (
+              <>
+                <select
+                  value={assignedDentistId}
+                  onChange={(e) => setAssignedDentistId(e.target.value)}
+                  className="input-field max-w-[140px] py-1.5 text-xs"
+                >
+                  {dentists.map((d) => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+                <ActionButton
+                  loading={loading === "reassign-dentist"}
+                  disabled={assignedDentistId === booking.assignedDentistId}
+                  onClick={() => runAction("reassign-dentist")}
+                >
+                  Change dentist
+                </ActionButton>
+              </>
+            )}
+            {!booking.followUpNeeded && canComplete && (
+              <ActionButton loading={loading === "set-follow-up"} onClick={() => runAction("set-follow-up", { followUpNeeded: true })}>
+                Follow-up
+              </ActionButton>
+            )}
+            {booking.followUpNeeded && (
+              <ActionButton loading={loading === "set-follow-up"} onClick={() => runAction("set-follow-up", { followUpNeeded: false })}>
+                Clear follow-up
+              </ActionButton>
+            )}
+            {canCancel && (
+              <ActionButton variant="danger" loading={loading === "cancel"} onClick={() => runAction("cancel")}>
+                Cancel
+              </ActionButton>
+            )}
+            <a href={`/manage/${booking.token}`} target="_blank" rel="noreferrer" className="admin-appt-icon-btn" title="Patient view">
+              <ExternalLink className="size-3.5" />
+            </a>
+            <a href={`mailto:${booking.email}`} className="admin-appt-icon-btn" title="Email">
+              <Mail className="size-3.5" />
+            </a>
           </div>
-        )}
-        <div className="admin-detail-item sm:col-span-2">
-          <dt className="admin-detail-label flex items-center gap-1.5">
-            <Mail className="size-3.5" />
-            Email
-          </dt>
-          <dd className="admin-detail-value break-all">{booking.email}</dd>
-        </div>
-      </div>
 
-      <AppointmentActions booking={booking} onUpdated={onUpdated} />
+          <details className="text-xs text-muted">
+            <summary className="cursor-pointer font-medium text-slate-500">Notes &amp; log</summary>
+            <div className="mt-2 space-y-2">
+              <textarea
+                value={internalNotes}
+                onChange={(e) => setInternalNotes(e.target.value)}
+                rows={2}
+                className="input-field text-xs"
+                placeholder="Staff-only note"
+              />
+              <ActionButton
+                loading={loading === "update-internal-notes"}
+                disabled={internalNotes === (booking.internalNotes ?? "")}
+                onClick={() => runAction("update-internal-notes")}
+              >
+                Save note
+              </ActionButton>
+              {booking.auditLog && booking.auditLog.length > 0 && (
+                <ul className="space-y-0.5 border-t border-gray-100 pt-2">
+                  {[...booking.auditLog].reverse().slice(0, 5).map((entry, i) => (
+                    <li key={`${entry.at}-${i}`}>
+                      {new Date(entry.at).toLocaleString()} — {entry.actor}: {entry.action}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </details>
+
+          {error && <p className="text-xs text-red-600">{error}</p>}
+        </div>
+      )}
     </article>
   );
 }

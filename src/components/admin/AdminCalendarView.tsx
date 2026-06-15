@@ -10,6 +10,8 @@ import type { ClinicDentist } from "@/lib/dentists";
 import { findDentistName } from "@/lib/dentists";
 import {
   countBookedSlots,
+  countCompletedSlots,
+  countInOperationSlots,
   countOpenSlots,
   countPendingSlots,
   filterBookingsForDentist,
@@ -76,7 +78,9 @@ export function AdminCalendarView({
 
   const openSlots = countOpenSlots(availability);
   const bookedSlots = countBookedSlots(availability);
+  const completedSlots = countCompletedSlots(availability);
   const pendingSlots = countPendingSlots(availability);
+  const inOperationSlots = countInOperationSlots(availability);
   const daySummary = getDaySummary(
     initialBookings,
     initialBlocks,
@@ -212,6 +216,10 @@ export function AdminCalendarView({
               Confirmed
             </span>
             <span className="flex items-center gap-2">
+              <span className="size-3 rounded-full bg-slate-400" />
+              Completed
+            </span>
+            <span className="flex items-center gap-2">
               <span className="size-3 rounded-full bg-amber-500" />
               Pending
             </span>
@@ -222,6 +230,10 @@ export function AdminCalendarView({
             <span className="flex items-center gap-2">
               <span className="size-3 rounded-full bg-gray-300" />
               Past
+            </span>
+            <span className="flex items-center gap-2">
+              <span className="size-3 rounded-full bg-violet-500" />
+              In session
             </span>
           </div>
         </section>
@@ -238,7 +250,9 @@ export function AdminCalendarView({
                   ? "This dentist is on leave — no appointments available."
                   : daySummary.blocked
                     ? "This day is blocked — no appointments available."
-                    : `${openSlots} open · ${bookedSlots} approved · ${pendingSlots} pending`}
+                    : `${openSlots} open · ${bookedSlots} approved · ${completedSlots} completed · ${pendingSlots} pending${
+                        inOperationSlots > 0 ? ` · ${inOperationSlots} in session` : ""
+                      }`}
               </p>
             </div>
 
@@ -251,22 +265,42 @@ export function AdminCalendarView({
                       ? "bg-green-50 text-green-800"
                       : slot.state === "booked"
                         ? "bg-primary/10 text-dark"
+                        : slot.state === "completed"
+                          ? "bg-slate-100 text-slate-600"
                         : slot.state === "pending"
                           ? "bg-amber-50 text-amber-900"
-                          : "bg-red-50 text-red-700"
+                          : slot.state === "in-operation"
+                            ? "bg-violet-50 text-violet-900 ring-1 ring-violet-200"
+                            : slot.state === "past"
+                              ? "bg-gray-100 text-gray-400 opacity-70"
+                              : "bg-red-50 text-red-700"
                   }`}
+                  aria-disabled={slot.state === "past"}
                 >
-                  <span className="font-medium">{slot.time}</span>
+                  <span className={`font-medium ${slot.state === "past" ? "line-through" : ""}`}>
+                    {slot.time}
+                  </span>
                   <span className="text-xs sm:text-left sm:text-inherit">
                     {slot.state === "open" && "Available"}
+                    {slot.state === "past" && "Past — unavailable"}
                     {slot.state === "blocked" && "Blocked / on leave"}
+                    {slot.state === "in-operation" && slot.booking && (
+                      <span className="wrap-break-word font-medium">
+                        In session · {slot.booking.name} · {slot.booking.service}
+                      </span>
+                    )}
                     {slot.state === "booked" && slot.booking && (
-                      <span className="break-words">
-                        Approved · {slot.booking.name} · {slot.booking.service}
+                      <span className="wrap-break-word">
+                        Confirmed · {slot.booking.name} · {slot.booking.service}
+                      </span>
+                    )}
+                    {slot.state === "completed" && slot.booking && (
+                      <span className="wrap-break-word">
+                        Completed · {slot.booking.name} · {slot.booking.service}
                       </span>
                     )}
                     {slot.state === "pending" && slot.booking && (
-                      <span className="break-words">
+                      <span className="wrap-break-word">
                         Pending · {slot.booking.name} · {slot.booking.service}
                         {isAnyDentist(slot.booking.preferredDentistId) ? " · Any doctor" : ""}
                       </span>

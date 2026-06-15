@@ -1,9 +1,4 @@
 import {
-  CalendarDays,
-  ClipboardList,
-  Clock,
-} from "lucide-react";
-import {
   filterTodayBookings,
   getTodayDateString,
   listBookingsForAdmin,
@@ -14,20 +9,24 @@ import {
   listTodayUnavailableDentists,
   listUpcomingDentistLeaves,
 } from "@/lib/dentist-leave";
-import { AdminAppointmentsClient } from "@/components/admin/AdminAppointmentsClient";
+import { getSessionFromCookies } from "@/lib/admin-auth";
+import { canViewAnalytics } from "@/content/admin";
 import { DentistLeaveOverview } from "@/components/admin/DentistLeaveOverview";
-import {
-  AdminPageHeader,
-  AdminSectionHeader,
-} from "@/components/admin/AdminPageHeader";
-import { AdminStatCard } from "@/components/admin/AdminStatCard";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminCalendarOverview } from "@/components/admin/AdminCalendarOverview";
 import { AdminAttendanceAlerts } from "@/components/admin/AdminAttendanceAlerts";
+import { AdminDashboardPanels } from "@/components/admin/AdminDashboardPanels";
+import { AdminAnalyticsSection } from "@/components/admin/AdminAnalyticsSection";
+import { AdminMorningBoard } from "@/components/admin/AdminMorningBoard";
+import { AdminOperationalMetrics } from "@/components/admin/AdminOperationalMetrics";
 import { needsStaffApproval } from "@/lib/booking-status";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminOverviewPage() {
+  const session = await getSessionFromCookies();
+  const showAnalytics = session ? canViewAnalytics(session.role) : false;
+
   const [bookings, blocks, dentists] = await Promise.all([
     listBookingsForAdmin(),
     getAllScheduleBlocks(),
@@ -37,6 +36,9 @@ export default async function AdminOverviewPage() {
   const todayBookings = filterTodayBookings(bookings);
   const pending = bookings.filter((booking) => needsStaffApproval(booking));
   const todayLabel = getTodayDateString();
+  const today = new Date();
+  const initialYear = today.getFullYear();
+  const initialMonth = today.getMonth();
 
   const allLeaves = listUpcomingDentistLeaves(blocks, dentists, todayLabel);
   const todayLeaves = listTodayUnavailableDentists(allLeaves);
@@ -44,56 +46,28 @@ export default async function AdminOverviewPage() {
 
   return (
     <div className="space-y-8">
-      <AdminPageHeader
-        title="Dashboard"
-        description="Here's what's happening at the clinic — appointments, approvals, and staff availability."
-      />
+      <AdminPageHeader title="Dashboard" />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <AdminStatCard
-          label="Today's visits"
-          value={todayBookings.length}
-          href="/admin/appointments?filter=today"
-          icon={CalendarDays}
-          accent="primary"
-        />
-        <AdminStatCard
-          label="Needs approval"
-          value={pending.length}
-          href="/admin/appointments?filter=pending"
-          icon={Clock}
-          accent="amber"
-        />
-        <AdminStatCard
-          label="All bookings"
-          value={bookings.length}
-          href="/admin/appointments?filter=all"
-          icon={ClipboardList}
-          accent="blue"
-        />
-      </div>
+      <AdminMorningBoard bookings={todayBookings} />
+
+      <AdminDashboardPanels pendingBookings={pending} todayBookings={todayBookings} />
+
+      {showAnalytics && (
+        <>
+          <AdminOperationalMetrics bookings={bookings} />
+          <AdminAnalyticsSection
+            bookings={bookings}
+            initialYear={initialYear}
+            initialMonth={initialMonth}
+          />
+        </>
+      )}
 
       <AdminAttendanceAlerts />
 
       <AdminCalendarOverview bookings={bookings} />
 
       <DentistLeaveOverview todayLeaves={todayLeaves} upcomingLeaves={upcomingLeaves} />
-
-      <section className="space-y-4">
-        <AdminSectionHeader
-          title={`Today — ${todayLabel}`}
-          href="/admin/appointments?filter=today"
-        />
-        <AdminAppointmentsClient initialBookings={todayBookings.slice(0, 5)} compact />
-      </section>
-
-      <section className="space-y-4">
-        <AdminSectionHeader
-          title="Pending approval"
-          href="/admin/appointments?filter=pending"
-        />
-        <AdminAppointmentsClient initialBookings={pending.slice(0, 3)} compact />
-      </section>
     </div>
   );
 }

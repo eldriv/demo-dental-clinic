@@ -1,8 +1,11 @@
 import type { Booking } from "./bookings";
 import { isRescheduledPatient } from "./booking-status";
+import { APPOINTMENT_DURATION_MINUTES } from "./clinic-settings";
 
 /** Minutes after scheduled start before reception gets a no-show alert. */
 export const LATE_ARRIVAL_THRESHOLD_MINUTES = 30;
+
+export { APPOINTMENT_DURATION_MINUTES };
 
 export interface AttendanceAlert {
   booking: Booking;
@@ -27,6 +30,38 @@ export function getAppointmentStart(date: string, time: string): Date {
   const start = new Date(`${date}T12:00:00`);
   start.setHours(hours, minutes, 0, 0);
   return start;
+}
+
+export function getAppointmentEnd(date: string, time: string): Date {
+  return new Date(
+    getAppointmentStart(date, time).getTime() + APPOINTMENT_DURATION_MINUTES * 60_000
+  );
+}
+
+/** Confirmed visit currently in the chair (within scheduled duration). */
+export function isAppointmentInProgress(booking: Booking, now = new Date()): boolean {
+  if (!isActiveAppointment(booking)) return false;
+  if (booking.date !== toDateString(now)) return false;
+
+  const start = getAppointmentStart(booking.date, booking.time);
+  const end = getAppointmentEnd(booking.date, booking.time);
+  return now.getTime() >= start.getTime() && now.getTime() < end.getTime();
+}
+
+export function slotOverlapsAppointment(
+  date: string,
+  slotTime: string,
+  booking: Booking,
+  slotDurationMinutes = 30
+): boolean {
+  if (booking.date !== date) return false;
+
+  const slotStart = getAppointmentStart(date, slotTime);
+  const slotEnd = new Date(slotStart.getTime() + slotDurationMinutes * 60_000);
+  const apptStart = getAppointmentStart(booking.date, booking.time);
+  const apptEnd = getAppointmentEnd(booking.date, booking.time);
+
+  return slotStart.getTime() < apptEnd.getTime() && slotEnd.getTime() > apptStart.getTime();
 }
 
 export function isActiveAppointment(booking: Booking): boolean {

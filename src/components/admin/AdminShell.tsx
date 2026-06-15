@@ -12,12 +12,17 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  PhoneCall,
   Stethoscope,
   Users,
   X,
 } from "lucide-react";
 import type { AdminRole } from "@/content/admin";
-import { canManageClinicSettings, getRoleLabel } from "@/content/admin";
+import {
+  canManageClinicSettings,
+  getRoleLabel,
+  isDentistRole,
+} from "@/content/admin";
 import { site } from "@/content";
 
 interface AdminShellProps {
@@ -26,27 +31,52 @@ interface AdminShellProps {
   children: React.ReactNode;
 }
 
-const navItems = [
-  { href: "/admin", label: "Overview", icon: LayoutDashboard, ownerOnly: false },
-  { href: "/admin/appointments", label: "Appointments", icon: CalendarDays, ownerOnly: false },
-  { href: "/admin/calendar", label: "Calendar", icon: CalendarRange, ownerOnly: false },
-  { href: "/admin/dentists", label: "Dentists", icon: Users, ownerOnly: false },
-  { href: "/admin/hours", label: "Clinic Hours", icon: Clock, ownerOnly: false },
-  { href: "/admin/schedule", label: "Block Schedule", icon: CalendarOff, ownerOnly: false },
+const allNavItems = [
+  { href: "/admin", label: "Overview", icon: LayoutDashboard },
+  { href: "/admin/my-day", label: "My Day", icon: Stethoscope, dentistOnly: true },
+  { href: "/admin/appointments", label: "Appointments", icon: CalendarDays },
+  { href: "/admin/patients", label: "Patients", icon: Users },
+  { href: "/admin/book", label: "Book appointment", icon: PhoneCall },
+  { href: "/admin/calendar", label: "Calendar", icon: CalendarRange },
+  { href: "/admin/dentists", label: "Dentists", icon: Users, ownerOnly: true },
+  { href: "/admin/hours", label: "Clinic Hours", icon: Clock, ownerOnly: true },
+  { href: "/admin/schedule", label: "Block Schedule", icon: CalendarOff, ownerOnly: true },
 ];
 
-const mobileNavItems = navItems.filter((item) =>
-  ["/admin", "/admin/appointments", "/admin/calendar"].includes(item.href)
-);
+const mobileNavItems = [
+  { href: "/admin", label: "Overview", icon: LayoutDashboard },
+  { href: "/admin/appointments", label: "Appointments", icon: CalendarDays },
+  { href: "/admin/patients", label: "Patients", icon: Users },
+  { href: "/admin/book", label: "Book", icon: PhoneCall },
+  { href: "/admin/calendar", label: "Calendar", icon: CalendarRange },
+];
+
+const dentistMobileNav = [
+  { href: "/admin/my-day", label: "My Day", icon: Stethoscope },
+  { href: "/admin/patients", label: "Patients", icon: Users },
+  { href: "/admin/calendar", label: "Calendar", icon: CalendarRange },
+];
 
 export function AdminShell({ userName, userRole, children }: AdminShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
+  const dentist = isDentistRole(userRole);
 
-  const visibleNav = navItems.filter(
-    (item) => !item.ownerOnly || canManageClinicSettings(userRole)
-  );
+  const visibleNav = allNavItems.filter((item) => {
+    if (dentist) {
+      return (
+        item.dentistOnly === true ||
+        item.href === "/admin/calendar" ||
+        item.href === "/admin/patients"
+      );
+    }
+    if (item.dentistOnly) return false;
+    if (item.ownerOnly) return canManageClinicSettings(userRole);
+    return true;
+  });
+
+  const bottomNav = dentist ? dentistMobileNav : mobileNavItems;
 
   const currentPage =
     visibleNav.find(
@@ -84,7 +114,7 @@ export function AdminShell({ userName, userRole, children }: AdminShellProps) {
             </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-bold text-white">{site.name}</p>
-              <p className="text-xs text-white/60">Staff dashboard</p>
+              <p className="text-xs text-white/60">{dentist ? "Provider view" : "Staff dashboard"}</p>
             </div>
           </div>
           {showClose && (
@@ -136,7 +166,6 @@ export function AdminShell({ userName, userRole, children }: AdminShellProps) {
 
   return (
     <div className="admin-layout">
-      {/* Mobile top bar */}
       <header className="admin-mobile-header lg:hidden">
         <button
           type="button"
@@ -155,7 +184,6 @@ export function AdminShell({ userName, userRole, children }: AdminShellProps) {
         </div>
       </header>
 
-      {/* Mobile drawer — only mounted when open */}
       {menuOpen && (
         <>
           <button
@@ -170,7 +198,6 @@ export function AdminShell({ userName, userRole, children }: AdminShellProps) {
         </>
       )}
 
-      {/* Desktop sidebar — always visible on lg+ */}
       <aside className="admin-sidebar-desktop hidden lg:flex">
         {renderSidebarContent(false)}
       </aside>
@@ -179,9 +206,8 @@ export function AdminShell({ userName, userRole, children }: AdminShellProps) {
         <main className="admin-content">{children}</main>
       </div>
 
-      {/* Mobile bottom nav — quick access to main sections */}
       <nav className="admin-bottom-nav lg:hidden" aria-label="Quick navigation">
-        {mobileNavItems.map(({ href, label, icon: Icon }) => (
+        {bottomNav.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}

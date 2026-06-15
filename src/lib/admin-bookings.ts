@@ -1,20 +1,23 @@
-import { getBookingByToken, updateBooking, getAllBookings } from "@/lib/bookings-store";
-import { createCalendarEvent, deleteCalendarEvent, updateCalendarEvent } from "@/lib/calendar";
+import { v4 as uuidv4 } from "uuid";
+import { getBookingByToken, updateBooking, getAllBookings, saveBooking } from "@/lib/bookings-store";
 import {
   sendBookingApprovedEmail,
   sendBookingDeclinedEmail,
   sendCancellationEmails,
+  sendBookingRequestEmails,
 } from "@/lib/email";
-import type { Booking } from "@/lib/bookings";
+import type { Booking, StaffCreateBookingInput } from "@/lib/bookings";
+import { BOOKING_VALIDATION } from "@/lib/bookings";
 import { buildManageUrl } from "@/lib/site-url";
 import { validateSlotBooking, ANY_DENTIST_ID } from "@/lib/booking-availability";
-import { getAllDentists, getDentistById, isValidDentistId } from "@/lib/dentists-store";
 import { isAnyDentist } from "@/lib/dentist-availability";
+import { getAllDentists, getDentistById, isValidDentistId } from "@/lib/dentists-store";
 import { getClinicSettings } from "@/lib/clinic-settings-store";
 import { getAllScheduleBlocks } from "@/lib/schedule-blocks";
 import { needsStaffApproval } from "@/lib/booking-status";
 import { isActiveAppointment } from "@/lib/appointment-attendance";
-import { sortBookingsByDateTime } from "@/lib/admin-booking-filters";
+import { sortBookingsByDateTime, getTodayDateString, filterTodayBookings, isTodayVisit } from "@/lib/admin-booking-filters";
+import { appendAuditEntry } from "@/lib/booking-audit";
 
 export {
   filterTodayBookings,
@@ -22,10 +25,25 @@ export {
   isTodayVisit,
 } from "@/lib/admin-booking-filters";
 
+type ActorOptions = { actor?: string };
+
+function withAudit(
+  booking: Booking,
+  updates: Partial<Booking>,
+  actor: string,
+  action: string,
+  detail?: string
+): Partial<Booking> {
+  return {
+    ...updates,
+    auditLog: appendAuditEntry(booking, { actor, action, detail }),
+  };
+}
+
 export async function approveBooking(
   token: string,
   siteUrl?: string,
-  options?: { assignedDentistId?: string; requireDentist?: boolean }
+  options?: { assignedDentistId?: string; requireDentist?: boolean; actor?: string }
 ): Promise<{ booking?: Booking; error?: string }> {
   const booking = await getBookingByToken(token);
   if (!booking) return { error: "Booking not found." };
@@ -77,35 +95,23 @@ export async function approveBooking(
     return { error: slotError };
   }
 
-  const bookingForCalendar: Booking = {
-    ...booking,
-    assignedDentistId: assignedDentistId ?? booking.assignedDentistId,
-    assignedDentistName: assignedDentist?.name ?? booking.assignedDentistName,
-    status: "confirmed",
-    rescheduledByPatient: false,
-  };
-
-  let calendarEventId = booking.calendarEventId;
-  if (calendarEventId) {
-    await updateCalendarEvent({ ...bookingForCalendar, calendarEventId });
-  } else {
-    const calendarResult = await createCalendarEvent(bookingForCalendar);
-    if (calendarResult.eventId) {
-      calendarEventId = calendarResult.eventId;
-    }
-  }
-
-  const updates: Partial<Booking> = {
-    status: "confirmed",
-    rescheduledByPatient: false,
-  };
-  if (assignedDentistId) {
-    updates.assignedDentistId = assignedDentistId;
-    updates.assignedDentistName = assignedDentist?.name;
-  }
-  if (calendarEventId) {
-    updates.calendarEventId = calendarEventId;
-  }
+  const actor = options?.actor ?? "staff";
+  const updates = withAudit(
+    booking,
+    {
+      status: "confirmed",
+      rescheduledByPatient: false,
+      ...(assignedDentistId
+        ? {
+            assignedDentistId,
+            assignedDentistName: assignedDentist?.name,
+          }
+        : {}),
+    },
+    actor,
+    "approved",
+    assignedDentist?.name
+  );
 
   const updated = await updateBooking(token, updates);
   if (!updated) return { error: "Failed to update booking." };
@@ -117,7 +123,8 @@ export async function approveBooking(
 export async function declineBooking(
   token: string,
   siteUrl?: string,
-  note?: string
+  note?: string,
+  options?: ActorOptions
 ): Promise<{ booking?: Booking; error?: string }> {
   const booking = await getBookingByToken(token);
   if (!booking) return { error: "Booking not found." };
@@ -125,7 +132,10 @@ export async function declineBooking(
     return { error: "Booking cannot be declined." };
   }
 
-  const updated = await updateBooking(token, { status: "declined" });
+  const updated = await updateBooking(
+    token,
+    withAudit(booking, { status: "declined" }, options?.actor ?? "staff", "declined", note)
+  );
   if (!updated) return { error: "Failed to update booking." };
 
   await sendBookingDeclinedEmail(updated, siteUrl, note);
@@ -133,7 +143,8 @@ export async function declineBooking(
 }
 
 export async function completeBooking(
-  token: string
+  token: string,
+  options?: ActorOptions & { visitNotes?: string }
 ): Promise<{ booking?: Booking; error?: string }> {
   const booking = await getBookingByToken(token);
   if (!booking) return { error: "Booking not found." };
@@ -142,17 +153,27 @@ export async function completeBooking(
     return { error: "Approve the booking before marking it completed." };
   }
 
-  const updated = await updateBooking(token, {
-    status: "completed",
-    completedAt: new Date().toISOString(),
-  });
+  const updated = await updateBooking(
+    token,
+    withAudit(
+      booking,
+      {
+        status: "completed",
+        completedAt: new Date().toISOString(),
+        ...(options?.visitNotes !== undefined ? { visitNotes: options.visitNotes.trim() } : {}),
+      },
+      options?.actor ?? "staff",
+      "completed"
+    )
+  );
   if (!updated) return { error: "Failed to update booking." };
   return { booking: updated };
 }
 
 export async function reassignBookingDentist(
   token: string,
-  assignedDentistId: string
+  assignedDentistId: string,
+  options?: ActorOptions
 ): Promise<{ booking?: Booking; error?: string }> {
   const booking = await getBookingByToken(token);
   if (!booking) return { error: "Booking not found." };
@@ -197,43 +218,46 @@ export async function reassignBookingDentist(
     return { error: slotError };
   }
 
-  const updates: Partial<Booking> = {
-    assignedDentistId: dentistId,
-    assignedDentistName: assignedDentist.name,
-  };
-
-  const updated = await updateBooking(token, updates);
+  const updated = await updateBooking(
+    token,
+    withAudit(
+      booking,
+      {
+        assignedDentistId: dentistId,
+        assignedDentistName: assignedDentist.name,
+      },
+      options?.actor ?? "staff",
+      "reassigned-dentist",
+      assignedDentist.name
+    )
+  );
   if (!updated) return { error: "Failed to update booking." };
-
-  if (updated.calendarEventId) {
-    await updateCalendarEvent(updated);
-  }
 
   return { booking: updated };
 }
 
 export async function cancelBookingAdmin(
   token: string,
-  siteUrl?: string
+  siteUrl?: string,
+  options?: ActorOptions
 ): Promise<{ booking?: Booking; error?: string }> {
   const booking = await getBookingByToken(token);
   if (!booking) return { error: "Booking not found." };
   if (booking.status === "cancelled") return { booking };
 
-  const updated = await updateBooking(token, { status: "cancelled" });
+  const updated = await updateBooking(
+    token,
+    withAudit(booking, { status: "cancelled" }, options?.actor ?? "staff", "cancelled")
+  );
   if (!updated) return { error: "Failed to cancel booking." };
 
-  if (updated.calendarEventId) {
-    await deleteCalendarEvent(updated.calendarEventId);
-  }
-
   await sendCancellationEmails(updated, siteUrl);
-
   return { booking: updated };
 }
 
 export async function confirmPatientAttendance(
-  token: string
+  token: string,
+  options?: ActorOptions
 ): Promise<{ booking?: Booking; error?: string }> {
   const booking = await getBookingByToken(token);
   if (!booking) return { error: "Booking not found." };
@@ -242,13 +266,229 @@ export async function confirmPatientAttendance(
   }
 
   const now = new Date().toISOString();
-  const updated = await updateBooking(token, {
-    attendanceConfirmed: true,
-    attendanceConfirmedAt: now,
-  });
+  const updated = await updateBooking(
+    token,
+    withAudit(
+      booking,
+      {
+        attendanceConfirmed: true,
+        attendanceConfirmedAt: now,
+      },
+      options?.actor ?? "staff",
+      "attendance-confirmed"
+    )
+  );
 
   if (!updated) return { error: "Failed to update booking." };
   return { booking: updated };
+}
+
+export async function markBookingNoShow(
+  token: string,
+  options?: ActorOptions
+): Promise<{ booking?: Booking; error?: string }> {
+  const booking = await getBookingByToken(token);
+  if (!booking) return { error: "Booking not found." };
+  if (!isActiveAppointment(booking) && booking.status !== "completed") {
+    return { error: "Only active appointments can be marked as no-show." };
+  }
+
+  const updated = await updateBooking(
+    token,
+    withAudit(
+      booking,
+      { noShow: true, status: "cancelled" },
+      options?.actor ?? "staff",
+      "no-show"
+    )
+  );
+  if (!updated) return { error: "Failed to update booking." };
+
+  return { booking: updated };
+}
+
+export async function updateBookingInternalNotes(
+  token: string,
+  internalNotes: string,
+  options?: ActorOptions
+): Promise<{ booking?: Booking; error?: string }> {
+  const booking = await getBookingByToken(token);
+  if (!booking) return { error: "Booking not found." };
+
+  const updated = await updateBooking(
+    token,
+    withAudit(
+      booking,
+      { internalNotes: internalNotes.trim().slice(0, 2000) },
+      options?.actor ?? "staff",
+      "internal-notes-updated"
+    )
+  );
+  if (!updated) return { error: "Failed to update notes." };
+  return { booking: updated };
+}
+
+export async function updateBookingVisitNotes(
+  token: string,
+  visitNotes: string,
+  options?: ActorOptions
+): Promise<{ booking?: Booking; error?: string }> {
+  const booking = await getBookingByToken(token);
+  if (!booking) return { error: "Booking not found." };
+
+  const updated = await updateBooking(
+    token,
+    withAudit(
+      booking,
+      { visitNotes: visitNotes.trim().slice(0, 2000) },
+      options?.actor ?? "staff",
+      "visit-notes-updated"
+    )
+  );
+  if (!updated) return { error: "Failed to update visit notes." };
+  return { booking: updated };
+}
+
+export async function setBookingFollowUp(
+  token: string,
+  followUpNeeded: boolean,
+  options?: ActorOptions
+): Promise<{ booking?: Booking; error?: string }> {
+  const booking = await getBookingByToken(token);
+  if (!booking) return { error: "Booking not found." };
+
+  const updated = await updateBooking(
+    token,
+    withAudit(
+      booking,
+      { followUpNeeded },
+      options?.actor ?? "staff",
+      followUpNeeded ? "follow-up-flagged" : "follow-up-cleared"
+    )
+  );
+  if (!updated) return { error: "Failed to update follow-up flag." };
+  return { booking: updated };
+}
+
+export async function patientCheckIn(
+  token: string
+): Promise<{ booking?: Booking; error?: string }> {
+  const booking = await getBookingByToken(token);
+  if (!booking) return { error: "Booking not found." };
+  if (!isActiveAppointment(booking)) {
+    return { error: "Check-in is only available for confirmed appointments on the day of your visit." };
+  }
+
+  const today = getTodayDateString();
+  if (booking.date !== today) {
+    return { error: "Check-in opens on the day of your appointment." };
+  }
+
+  if (booking.checkedInAt) {
+    return { booking };
+  }
+
+  const updated = await updateBooking(
+    token,
+    withAudit(booking, { checkedInAt: new Date().toISOString() }, "patient", "checked-in")
+  );
+  if (!updated) return { error: "Failed to check in." };
+  return { booking: updated };
+}
+
+function validateStaffBookingFields(body: StaffCreateBookingInput): string | null {
+  if (!body.name?.trim() || body.name.trim().length < BOOKING_VALIDATION.name.min) {
+    return "Please provide a valid name.";
+  }
+  if (!body.email?.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)) {
+    return "Please provide a valid email address.";
+  }
+  if (!body.phone?.trim() || body.phone.trim().length < BOOKING_VALIDATION.phone.min) {
+    return "Please provide a valid phone number.";
+  }
+  if (!body.service?.trim()) return "Please select a service.";
+  if (!body.date?.trim() || !body.time?.trim()) return "Please select date and time.";
+  if (!body.assignedDentistId?.trim()) return "Please assign a dentist.";
+  return null;
+}
+
+export async function createStaffBooking(
+  body: StaffCreateBookingInput,
+  siteUrl?: string,
+  options?: ActorOptions
+): Promise<{ booking?: Booking; error?: string }> {
+  const fieldError = validateStaffBookingFields(body);
+  if (fieldError) return { error: fieldError };
+
+  const assignedDentistId = body.assignedDentistId.trim();
+  if (!(await isValidDentistId(assignedDentistId))) {
+    return { error: "Invalid dentist selected." };
+  }
+
+  const assignedDentist = await getDentistById(assignedDentistId);
+  if (!assignedDentist) return { error: "Dentist not found." };
+
+  const [settings, bookings, blocks, dentists] = await Promise.all([
+    getClinicSettings(),
+    getAllBookings(),
+    getAllScheduleBlocks(),
+    getAllDentists(),
+  ]);
+
+  const slotError = validateSlotBooking({
+    date: body.date,
+    time: body.time,
+    settings,
+    bookings,
+    blocks,
+    dentists,
+    dentistId: assignedDentistId,
+  });
+
+  if (slotError) return { error: slotError };
+
+  const now = new Date().toISOString();
+  const token = uuidv4();
+  const autoConfirm = body.autoConfirm !== false;
+  const actor = options?.actor ?? "staff";
+
+  const booking: Booking = {
+    id: uuidv4(),
+    token,
+    name: body.name.trim(),
+    email: body.email.trim().toLowerCase(),
+    phone: body.phone.trim(),
+    service: body.service.trim(),
+    date: body.date,
+    time: body.time,
+    status: autoConfirm ? "confirmed" : "pending",
+    source: "staff",
+    createdAt: now,
+    updatedAt: now,
+    preferredDentistId: assignedDentistId,
+    preferredDentistName: assignedDentist.name,
+    assignedDentistId,
+    assignedDentistName: assignedDentist.name,
+    internalNotes: body.internalNotes?.trim() || undefined,
+    auditLog: [
+      {
+        at: now,
+        actor,
+        action: autoConfirm ? "staff-booking-confirmed" : "staff-booking-created",
+        detail: assignedDentist.name,
+      },
+    ],
+  };
+
+  await saveBooking(booking);
+
+  if (autoConfirm) {
+    await sendBookingApprovedEmail(booking, siteUrl);
+  } else {
+    await sendBookingRequestEmails(booking, siteUrl);
+  }
+
+  return { booking };
 }
 
 export function getManageLink(token: string, siteUrl?: string): string {
@@ -257,4 +497,28 @@ export function getManageLink(token: string, siteUrl?: string): string {
 
 export async function listBookingsForAdmin(): Promise<Booking[]> {
   return sortBookingsByDateTime(await getAllBookings());
+}
+
+export function filterBookingsForDentist(bookings: Booking[], dentistId: string): Booking[] {
+  return sortBookingsByDateTime(
+    bookings.filter((booking) => {
+      if (booking.status === "cancelled" || booking.status === "declined") return false;
+      if (booking.assignedDentistId === dentistId) return true;
+      if (booking.preferredDentistId === dentistId) return true;
+      if (
+        isAnyDentist(booking.preferredDentistId) &&
+        isAnyDentist(booking.assignedDentistId)
+      ) {
+        return true;
+      }
+      return false;
+    })
+  );
+}
+
+export function filterTodayForDentist(bookings: Booking[], dentistId: string): Booking[] {
+  const today = getTodayDateString();
+  return filterBookingsForDentist(bookings, dentistId).filter((booking) =>
+    isTodayVisit(booking, today)
+  );
 }

@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { verifySessionToken, ADMIN_SESSION_COOKIE } from "@/lib/admin-auth";
+import {
+  getDefaultAdminPath,
+  isDentistRole,
+  isOwnerOnlyPath,
+  isStaffOnlyPath,
+} from "@/content/admin";
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -28,6 +34,19 @@ export async function middleware(request: NextRequest) {
     const loginUrl = new URL("/admin/login", request.url);
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
+  }
+
+  if (isDentistRole(session.role)) {
+    if (pathname === "/admin") {
+      return NextResponse.redirect(new URL("/admin/my-day", request.url));
+    }
+    if (isAdminPage && (isOwnerOnlyPath(pathname) || isStaffOnlyPath(pathname))) {
+      return NextResponse.redirect(new URL("/admin/my-day", request.url));
+    }
+  }
+
+  if (isAdminPage && isOwnerOnlyPath(pathname) && session.role !== "owner") {
+    return NextResponse.redirect(new URL(getDefaultAdminPath(session.role), request.url));
   }
 
   return NextResponse.next();

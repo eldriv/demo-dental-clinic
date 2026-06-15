@@ -1,3 +1,12 @@
+export type BookingSource = "web" | "staff";
+
+export interface BookingAuditEntry {
+  at: string;
+  actor: string;
+  action: string;
+  detail?: string;
+}
+
 export interface Booking {
   id: string;
   token: string;
@@ -10,27 +19,30 @@ export interface Booking {
   status: "pending" | "confirmed" | "cancelled" | "rescheduled" | "declined" | "completed";
   createdAt: string;
   updatedAt: string;
-  calendarEventId?: string;
-  /** Patient's dentist preference from the booking form. */
+  /** Where the booking was created. */
+  source?: BookingSource;
   preferredDentistId?: string;
   preferredDentistName?: string;
-  /** Set by staff when approving */
   assignedDentistId?: string;
   assignedDentistName?: string;
-  /** Set when the patient picks a new date/time from their manage link. */
   rescheduledByPatient?: boolean;
-  /** Patient reported they will be late (ISO timestamp). */
   lateNoticeAt?: string;
-  /** Estimated minutes late, if provided by patient. */
   lateNoticeMinutes?: number;
-  /** Optional note from patient about late arrival. */
   lateNoticeNote?: string;
-  /** Reception confirmed patient is still coming after a no-show alert. */
   attendanceConfirmed?: boolean;
-  /** When reception confirmed attendance. */
   attendanceConfirmedAt?: string;
-  /** When staff marked the visit as completed. */
+  /** Patient checked in on arrival (from manage link). */
+  checkedInAt?: string;
   completedAt?: string;
+  /** Staff-only notes visible in admin. */
+  internalNotes?: string;
+  /** Dentist/staff notes after visit. */
+  visitNotes?: string;
+  followUpNeeded?: boolean;
+  noShow?: boolean;
+  reminder24hSentAt?: string;
+  reminder2hSentAt?: string;
+  auditLog?: BookingAuditEntry[];
 }
 
 export interface CreateBookingInput {
@@ -43,6 +55,12 @@ export interface CreateBookingInput {
   dentistId?: string;
 }
 
+export interface StaffCreateBookingInput extends CreateBookingInput {
+  assignedDentistId: string;
+  autoConfirm?: boolean;
+  internalNotes?: string;
+}
+
 export interface RescheduleBookingInput {
   date: string;
   time: string;
@@ -53,3 +71,7 @@ export const BOOKING_VALIDATION = {
   phone: { min: 7, max: 20 },
   email: { max: 254 },
 } as const;
+
+export function getBookingSource(booking: Booking): BookingSource {
+  return booking.source ?? "web";
+}

@@ -19,15 +19,7 @@ cp .env.example .env.local
 | `SMTP_USER` | Gmail address |
 | `SMTP_PASS` | Gmail App Password (not your regular password) |
 | `CLINIC_EMAIL` | Email address that receives booking notifications |
-
-### Optional — Google Calendar
-
-| Variable | Description |
-|---|---|
-| `GOOGLE_CLIENT_ID` | OAuth 2.0 Client ID |
-| `GOOGLE_CLIENT_SECRET` | OAuth 2.0 Client Secret |
-| `GOOGLE_REFRESH_TOKEN` | Long-lived refresh token |
-| `GOOGLE_CALENDAR_ID` | Calendar ID (usually `primary`) |
+| `CLINIC_TIMEZONE` | IANA timezone for slots (e.g. `Asia/Manila`) |
 
 ## 2. Gmail SMTP Setup
 
@@ -38,17 +30,7 @@ cp .env.example .env.local
 
 If SMTP is not configured, bookings still save but patients see a message to call the clinic phone number.
 
-## 3. Google Calendar OAuth (Optional)
-
-1. Create a project in [Google Cloud Console](https://console.cloud.google.com/).
-2. Enable the **Google Calendar API**.
-3. Create OAuth 2.0 credentials (Web application).
-4. Add authorized redirect URI: `https://yoursite.netlify.app/api/auth/google/callback`
-5. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in your env.
-6. Visit `/api/auth/google` in your browser to authorize.
-7. Copy the refresh token displayed and set `GOOGLE_REFRESH_TOKEN`.
-
-## 4. Local Development
+## 3. Local Development
 
 Bookings are stored in `.data/bookings/bookings.json` during development. This directory is gitignored.
 
@@ -56,7 +38,7 @@ Bookings are stored in `.data/bookings/bookings.json` during development. This d
 npm run dev
 ```
 
-## 5. Netlify Deployment
+## 4. Netlify Deployment
 
 1. Push your repo to GitHub/GitLab/Bitbucket.
 2. In Netlify, create a new site from the repository.
@@ -72,7 +54,7 @@ npm run dev
 
 Production bookings are stored in Netlify Blobs (store name: `bookings`). No additional configuration is needed — the `@netlify/blobs` SDK works automatically in the Netlify runtime.
 
-## 6. Customizing Content
+## 5. Customizing Content
 
 All editable copy lives in `src/content/`:
 
@@ -86,7 +68,7 @@ All editable copy lives in `src/content/`:
 
 Replace `public/logo.png` and `public/og-image.png` with client assets. Update brand colors in `src/app/globals.css` `@theme inline` block.
 
-## 7. Verify Build
+## 6. Verify Build
 
 ```bash
 npm run build

@@ -175,7 +175,7 @@ body {
 }
 
 .admin-segment {
-  @apply flex max-w-full gap-1 overflow-x-auto rounded-xl bg-white p-1 shadow-sm ring-1 ring-gray-200/80 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden;
+  @apply flex max-w-full gap-1 overflow-x-auto rounded-xl bg-white p-1 shadow-sm ring-1 ring-gray-200/80 scrollbar-none [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden;
 }
 
 .admin-segment-btn {
@@ -188,6 +188,10 @@ body {
 
 .admin-badge {
   @apply inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold;
+}
+
+.admin-badge-compact {
+  @apply px-2 py-0.5 text-[10px] font-medium leading-none;
 }
 
 .admin-info-banner {
@@ -225,6 +229,438 @@ body {
 .admin-actions-bar .btn-cta-sm,
 .admin-actions-bar .btn-outline {
   @apply w-full justify-center sm:w-auto;
+}
+
+.admin-appt-card {
+  @apply space-y-0;
+}
+
+.admin-appt-compact {
+  @apply rounded-xl border border-gray-100 bg-white shadow-sm ring-1 ring-gray-100/80;
+}
+
+.admin-appt-compact-open {
+  @apply ring-primary/20;
+}
+
+.admin-appt-compact-head {
+  @apply flex items-center gap-2 px-3 py-2;
+}
+
+.admin-appt-compact-toggle {
+  @apply flex min-w-0 flex-1 items-center gap-2 text-left;
+}
+
+.admin-appt-time {
+  @apply w-14 shrink-0 text-xs font-bold tabular-nums text-primary sm:w-16 sm:text-sm;
+}
+
+.admin-appt-compact-actions {
+  @apply flex shrink-0 items-center gap-1;
+}
+
+.admin-appt-icon-btn {
+  @apply inline-flex size-7 items-center justify-center rounded-lg border border-gray-200 text-slate-600 transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-primary;
+}
+
+.admin-appt-chips {
+  @apply flex flex-wrap gap-1 border-t border-gray-50 px-3 pb-2;
+}
+
+.admin-appt-expanded {
+  @apply space-y-2 border-t border-gray-100 bg-surface/30 px-3 py-2;
+}
+
+.admin-appt-meta {
+  @apply flex flex-wrap items-center gap-x-1.5 gap-y-0.5;
+}
+
+.admin-appt-actions {
+  @apply mt-5 space-y-4 border-t border-gray-100 pt-5;
+}
+
+.admin-appt-primary {
+  @apply flex flex-col gap-3;
+}
+
+.admin-appt-field {
+  @apply rounded-xl border border-gray-100 bg-surface/40 p-3;
+}
+
+.admin-appt-panel {
+  @apply rounded-xl border px-4 py-3;
+}
+
+.admin-appt-panel-warn {
+  @apply border-amber-100 bg-amber-50/60;
+}
+
+.admin-appt-quicklinks {
+  @apply flex flex-wrap gap-2;
+}
+
+.admin-appt-quicklink {
+  @apply inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-primary;
+}
+
+.admin-appt-details {
+  @apply rounded-xl border border-gray-100 bg-surface/30;
+}
+
+.admin-appt-details-summary {
+  @apply flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-sm font-medium text-slate-700 marker:content-none [&::-webkit-details-marker]:hidden;
+}
+
+.admin-appt-details-body {
+  @apply border-t border-gray-100 px-4 py-4;
+}
+
+.admin-appt-staff-note {
+  @apply rounded-xl border border-amber-100 bg-amber-50/50 px-3 py-2 text-sm text-amber-950;
+}
+
+.admin-book-form {
+  @apply space-y-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm ring-1 ring-gray-100/80 sm:p-5;
+}
+
+.admin-book-grid {
+  @apply grid gap-3 lg:grid-cols-2 lg:gap-4;
+}
+
+.admin-book-section {
+  @apply rounded-xl border border-gray-100 bg-surface/30 p-3;
+}
+
+.admin-book-section-title {
+  @apply mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted;
+}
+
+.admin-book-label {
+  @apply mb-0.5 block text-[10px] font-semibold uppercase tracking-wider text-muted;
+}
+
+.admin-book-times-empty {
+  @apply rounded-lg border border-dashed border-gray-200 bg-white px-3 py-2 text-center text-xs text-muted;
+}
+
+.admin-book-footer {
+  @apply flex flex-wrap items-center gap-3 border-t border-gray-100 pt-3;
+}
+
+.admin-myday-toolbar {
+  @apply flex flex-col gap-2 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm ring-1 ring-gray-100/80 sm:flex-row sm:items-center sm:justify-between;
+}
+
+.admin-myday-stats {
+  @apply flex flex-wrap items-center gap-1.5 text-xs text-slate-600;
+}
+
+.admin-myday-filters {
+  @apply flex gap-1;
+}
+
+.admin-myday-filter {
+  @apply inline-flex items-center gap-1.5 rounded-lg border border-transparent px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-surface;
+}
+
+.admin-myday-filter-active {
+  @apply border-primary/20 bg-primary/10 text-primary;
+}
+
+.admin-myday-filter-count {
+  @apply rounded-full bg-white/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-muted;
+}
+
+.admin-myday-filter-active .admin-myday-filter-count {
+  @apply bg-primary/15 text-primary;
+}
+
+.admin-myday-section-title {
+  @apply mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted;
+}
+
+.admin-myday-section {
+  @apply space-y-1;
+}
+
+.admin-myday-empty {
+  @apply rounded-2xl border border-dashed border-gray-200 bg-white px-4 py-10 text-center;
+}
+
+.admin-myday-now {
+  @apply border-primary/30 ring-primary/15;
+}
+
+.admin-myday-pending {
+  @apply border-amber-200/80 ring-amber-100;
+}
+
+.admin-myday-done {
+  @apply opacity-80;
+}
+
+.admin-myday-chip {
+  @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium;
+}
+
+.admin-myday-chip-green {
+  @apply bg-green-100 text-green-800;
+}
+
+.admin-myday-chip-amber {
+  @apply bg-amber-100 text-amber-900;
+}
+
+.admin-patient-page {
+  @apply space-y-4;
+}
+
+.admin-patient-layout {
+  @apply grid gap-4 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)] lg:items-start;
+}
+
+.admin-patient-layout-open .admin-patient-detail-wrap {
+  @apply block;
+}
+
+.admin-patient-list-panel {
+  @apply space-y-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm ring-1 ring-gray-100/80 sm:p-4;
+}
+
+.admin-patient-toolbar {
+  @apply space-y-2.5;
+}
+
+.admin-patient-filters {
+  @apply flex flex-wrap gap-1.5;
+}
+
+.admin-patient-filter {
+  @apply inline-flex items-center gap-1.5 rounded-lg border border-transparent px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-surface;
+}
+
+.admin-patient-filter-active {
+  @apply border-primary/20 bg-primary/10 text-primary;
+}
+
+.admin-patient-filter-count {
+  @apply rounded-full bg-white/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-muted;
+}
+
+.admin-patient-filter-active .admin-patient-filter-count {
+  @apply bg-primary/15 text-primary;
+}
+
+.admin-patient-list {
+  @apply max-h-[min(70vh,640px)] space-y-1.5 overflow-y-auto pr-0.5;
+}
+
+.admin-patient-row {
+  @apply flex w-full items-center gap-3 rounded-xl border border-transparent px-2 py-2 text-left transition-colors hover:bg-surface/60;
+}
+
+.admin-patient-row-active {
+  @apply border-primary/20 bg-primary/5;
+}
+
+.admin-patient-avatar {
+  @apply flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary;
+}
+
+.admin-patient-avatar-lg {
+  @apply size-11 text-sm;
+}
+
+.admin-patient-row-meta {
+  @apply flex shrink-0 flex-col items-end gap-1;
+}
+
+.admin-patient-visit-pill {
+  @apply rounded-full bg-surface px-2 py-0.5 text-[10px] font-medium tabular-nums text-slate-600;
+}
+
+.admin-patient-row-active .admin-patient-visit-pill {
+  @apply bg-white text-primary;
+}
+
+.admin-patient-badge {
+  @apply inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide;
+}
+
+.admin-patient-badge-new {
+  @apply bg-blue-100 text-blue-800;
+}
+
+.admin-patient-detail-wrap {
+  @apply hidden lg:block;
+}
+
+.admin-patient-detail-wrap-open {
+  @apply fixed inset-0 z-40 flex flex-col justify-end p-0 lg:static lg:z-auto lg:block lg:p-0;
+}
+
+.admin-patient-backdrop {
+  @apply absolute inset-0 bg-black/30;
+}
+
+.admin-patient-detail-wrap-open .admin-patient-detail {
+  @apply relative z-10 max-h-[85vh] rounded-t-2xl rounded-b-none lg:max-h-[min(80vh,720px)] lg:rounded-2xl;
+}
+
+.admin-patient-detail {
+  @apply flex max-h-[min(80vh,720px)] flex-col gap-3 overflow-hidden rounded-2xl border border-gray-100 bg-white p-4 shadow-sm ring-1 ring-gray-100/80 lg:sticky lg:top-4;
+}
+
+.admin-patient-detail-loading {
+  @apply min-h-[240px] items-center justify-center;
+}
+
+.admin-patient-detail-hero {
+  @apply flex items-start gap-3 border-b border-gray-100 pb-3;
+}
+
+.admin-patient-stat-pills {
+  @apply flex flex-wrap gap-1.5;
+}
+
+.admin-patient-stat-pill {
+  @apply inline-flex items-center gap-1 rounded-full bg-surface px-2.5 py-1 text-[11px] text-slate-600;
+}
+
+.admin-patient-stat-pill strong {
+  @apply font-semibold text-dark;
+}
+
+.admin-patient-stat-pill-muted {
+  @apply max-w-full truncate text-muted;
+}
+
+.admin-patient-banner {
+  @apply flex items-start gap-2 rounded-xl px-3 py-2 text-xs;
+}
+
+.admin-patient-banner-new {
+  @apply bg-blue-50 text-blue-900;
+}
+
+.admin-patient-banner-upcoming {
+  @apply border border-green-100 bg-green-50/70;
+}
+
+.admin-patient-section {
+  @apply min-h-0 flex-1 overflow-hidden;
+}
+
+.admin-patient-section-title {
+  @apply mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted;
+}
+
+.admin-patient-timeline {
+  @apply max-h-[min(50vh,420px)] space-y-0 overflow-y-auto pr-1;
+}
+
+.admin-patient-timeline-item {
+  @apply relative flex gap-3 pb-3 last:pb-0;
+}
+
+.admin-patient-timeline-dot {
+  @apply relative z-10 mt-1.5 size-2.5 shrink-0 rounded-full border-2 border-primary bg-white;
+}
+
+.admin-patient-timeline-line {
+  @apply absolute left-[4px] top-4 bottom-0 w-px bg-gray-200;
+}
+
+.admin-patient-timeline-card {
+  @apply min-w-0 flex-1 rounded-xl border border-gray-100 bg-surface/30 px-3 py-2.5;
+}
+
+.admin-patient-status {
+  @apply shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium;
+}
+
+.admin-patient-status-done {
+  @apply bg-gray-100 text-gray-700;
+}
+
+.admin-patient-status-active {
+  @apply bg-green-100 text-green-800;
+}
+
+.admin-patient-status-pending {
+  @apply bg-amber-100 text-amber-900;
+}
+
+.admin-patient-note-block {
+  @apply mt-2 rounded-lg border border-primary/10 bg-white px-2.5 py-2;
+}
+
+.admin-patient-note-label {
+  @apply mb-1 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted;
+}
+
+.admin-patient-staff-block {
+  @apply mt-2 rounded-lg border border-amber-100 bg-amber-50/80 px-2.5 py-2;
+}
+
+.admin-patient-note-missing {
+  @apply mt-2 text-[10px] italic text-muted;
+}
+
+.admin-patient-empty {
+  @apply flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-gray-200 px-4 py-10 text-center;
+}
+
+.admin-patient-empty-inline {
+  @apply text-xs text-muted;
+}
+
+.admin-patient-placeholder {
+  @apply min-h-[320px] flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-surface/30 p-6;
+}
+
+.admin-dash-panel-title {
+  @apply text-xs font-semibold uppercase tracking-wide text-slate-500 sm:text-[13px];
+}
+
+.admin-dash-panel-more {
+  @apply flex size-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-white hover:text-primary;
+}
+
+.admin-dash-panel-card {
+  @apply rounded-xl border border-gray-100 bg-white shadow-sm ring-1 ring-gray-100/80;
+}
+
+.admin-dash-panel-card-filled {
+  @apply p-3.5 sm:p-4;
+}
+
+.admin-dash-panel-card-empty {
+  @apply min-h-[240px] p-5 sm:p-6;
+}
+
+.admin-dash-panel-empty {
+  @apply flex min-h-[180px] flex-col items-center justify-center px-4 text-center;
+}
+
+.admin-dash-list-item {
+  @apply block py-2.5 transition-colors hover:bg-surface/50 sm:py-2;
+}
+
+.admin-dash-list-divider {
+  @apply border-t border-gray-100 first:border-t-0;
+}
+
+.admin-analytics-card {
+  @apply h-full rounded-xl border border-gray-100 bg-white p-4 shadow-sm ring-1 ring-gray-100/80 sm:p-5;
+}
+
+.admin-analytics-card-title {
+  @apply text-sm font-medium text-slate-700;
+}
+
+.admin-analytics-month-btn {
+  @apply flex size-7 items-center justify-center rounded-md border border-gray-200 bg-white text-slate-500 transition-colors hover:border-gray-300 hover:text-dark;
 }
 
 .placeholder-cover {

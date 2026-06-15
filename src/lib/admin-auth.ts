@@ -106,6 +106,9 @@ export function verifyAdminPassword(account: AdminAccount, password: string): bo
   }
 
   if (process.env.NODE_ENV !== "production") {
+    if (account.role === "dentist") {
+      return password === "dentist2026";
+    }
     return password === "smilecare2026";
   }
 

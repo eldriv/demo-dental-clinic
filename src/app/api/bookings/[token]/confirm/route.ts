@@ -40,7 +40,11 @@ export async function GET(request: Request, { params }: RouteParams) {
     });
   }
 
-  const result = await approveBooking(token, siteUrl);
+  const result = await approveBooking(token, siteUrl, {
+    assignedDentistId: booking.preferredDentistId,
+    requireDentist: false,
+    actor: "email-confirm",
+  });
   if (result.error || !result.booking) {
     return new NextResponse(
       `<html><body style="font-family:system-ui;max-width:520px;margin:40px auto;padding:20px;text-align:center;">
