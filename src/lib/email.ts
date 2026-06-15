@@ -11,6 +11,7 @@ import {
   buildPatientRequestEmail,
   buildDentistInviteEmail,
   formatDisplayDate,
+  CHECK_IN_EMAIL_TIP,
 } from "./email-templates";
 
 function isSmtpConfigured(): boolean {
@@ -96,7 +97,7 @@ export async function sendBookingApprovedEmail(
       from: `"${site.name}" <${process.env.SMTP_USER}>`,
       to: booking.email,
       subject: `Appointment Confirmed — ${site.name}`,
-      text: `Dear ${booking.name},\n\nYour appointment has been confirmed.\n\n${formatBookingDetails(booking)}\n\nManage your appointment: ${manageUrl}\n\nThank you,\n${site.name}`,
+      text: `Dear ${booking.name},\n\nYour appointment has been confirmed.\n\n${formatBookingDetails(booking)}\n\nManage your appointment: ${manageUrl}\n\n${CHECK_IN_EMAIL_TIP}\n\nThank you,\n${site.name}`,
       html: buildPatientApprovedEmail(booking, baseUrl),
     });
 
@@ -321,12 +322,13 @@ export async function sendAppointmentReminderEmail(
         kind === "24h"
           ? `Reminder: appointment tomorrow — ${site.name}`
           : `Reminder: appointment today — ${site.name}`,
-      text: `Dear ${booking.name},\n\nThis is a reminder that your appointment is ${when}.\n\n${formatBookingDetails(booking)}\n\nManage: ${manageUrl}\n\nThank you,\n${site.name}`,
+      text: `Dear ${booking.name},\n\nThis is a reminder that your appointment is ${when}.\n\n${formatBookingDetails(booking)}\n\nManage: ${manageUrl}\n\n${kind === "2h" ? `${CHECK_IN_EMAIL_TIP}\n\n` : ""}Thank you,\n${site.name}`,
       html: buildBrandedEmail({
         heading: kind === "24h" ? "Appointment Tomorrow" : "Appointment Today",
         intro: `Hi ${booking.name}, your ${booking.service} appointment is ${when}.`,
         rows: bookingDetailRows(booking),
         cta: { label: "Manage or check in", href: manageUrl, color: "primary" },
+        tipNote: kind === "2h" ? CHECK_IN_EMAIL_TIP : undefined,
         footerNote: "Running late? Use the manage link to notify the front desk.",
       }),
     });

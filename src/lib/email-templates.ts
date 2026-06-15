@@ -29,8 +29,12 @@ interface EmailLayoutOptions {
   intro: string;
   rows: Array<{ label: string; value: string }>;
   cta?: { label: string; href: string; color?: "primary" | "accent" };
+  tipNote?: string;
   footerNote?: string;
 }
+
+export const CHECK_IN_EMAIL_TIP =
+  "Already at the clinic? Open Manage Appointment and tap \"I've arrived — check in\" so the front desk knows you're here.";
 
 export function buildBrandedEmail(options: EmailLayoutOptions): string {
   const siteUrl = getSiteUrl();
@@ -69,6 +73,10 @@ export function buildBrandedEmail(options: EmailLayoutOptions): string {
       </p>`
     : "";
 
+  const tipHtml = options.tipNote
+    ? `<p style="margin:20px 0 0;padding:14px 16px;background:#ecfdf5;border-radius:12px;border:1px solid #a7f3d0;font-size:14px;line-height:1.65;color:#065f46;">${escapeHtml(options.tipNote)}</p>`
+    : "";
+
   const footerNote = options.footerNote
     ? `<p style="margin:0 0 16px;font-size:13px;color:#cbd5e1;line-height:1.6;">${escapeHtml(options.footerNote)}</p>`
     : "";
@@ -101,6 +109,7 @@ export function buildBrandedEmail(options: EmailLayoutOptions): string {
                 ${rowsHtml}
               </table>
               ${ctaHtml}
+              ${tipHtml}
             </td>
           </tr>
           <tr>
@@ -180,6 +189,7 @@ export function buildPatientApprovedEmail(booking: Booking, siteUrl?: string): s
     intro: `Great news, ${booking.name}! Your appointment at ${site.name} has been approved. We look forward to seeing you.`,
     rows: bookingDetailRows(booking),
     cta: { label: "Manage Appointment", href: manageUrl, color: "primary" },
+    tipNote: CHECK_IN_EMAIL_TIP,
     footerNote: "Need to reschedule or cancel? Use the button above anytime before your visit.",
   });
 }

@@ -73,6 +73,26 @@ body {
   @apply border-red-200 text-red-600 hover:border-red-400 hover:bg-red-50;
 }
 
+.manage-action-btn {
+  @apply inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-60;
+}
+
+.manage-action-btn-primary {
+  @apply bg-primary text-white shadow-sm ring-1 ring-primary/20 hover:bg-primary-light;
+}
+
+.manage-action-btn-secondary {
+  @apply border border-gray-200 bg-white text-dark hover:border-primary/30 hover:bg-primary/5;
+}
+
+.manage-action-btn-danger {
+  @apply border border-red-200 bg-white text-red-600 hover:border-red-300 hover:bg-red-50;
+}
+
+.manage-action-grid {
+  @apply grid grid-cols-1 gap-2.5 sm:grid-cols-2;
+}
+
 /* Admin dashboard */
 .admin-layout {
   @apply min-h-dvh bg-[#eef3f0];

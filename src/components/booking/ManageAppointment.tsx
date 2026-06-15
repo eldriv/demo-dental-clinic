@@ -311,55 +311,64 @@ export function ManageAppointment({ initialBooking }: ManageAppointmentProps) {
       </dl>
 
       {canManage && mode === "view" && (
-        <div className="mt-8 flex flex-wrap gap-3">
+        <div className="mt-8 space-y-2.5">
           {canCheckIn && (
             <button
               type="button"
               onClick={handleCheckIn}
               disabled={status === "loading"}
-              className="btn-cta flex-1"
+              className="manage-action-btn manage-action-btn-primary"
             >
-              {status === "loading" ? <Loader2 className="size-4 animate-spin" /> : "I've arrived — check in"}
+              {status === "loading" ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                "I've arrived — check in"
+              )}
             </button>
           )}
-          {canLateNotice && !bookingData.lateNoticeAt && (
+
+          <div className="manage-action-grid">
+            {canLateNotice && !bookingData.lateNoticeAt && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("late");
+                  setStatus("idle");
+                  setMessage("");
+                }}
+                className="manage-action-btn manage-action-btn-secondary"
+              >
+                Running late?
+              </button>
+            )}
             <button
               type="button"
               onClick={() => {
-                setMode("late");
+                setMode("reschedule");
                 setStatus("idle");
                 setMessage("");
+                setRescheduleDate(bookingData.date);
+                setRescheduleTime(bookingData.time);
               }}
-              className="btn-outline flex-1"
+              className="manage-action-btn manage-action-btn-primary"
             >
-              Running late?
+              Reschedule
             </button>
-          )}
-          <button
-            type="button"
-            onClick={() => {
-              setMode("reschedule");
-              setStatus("idle");
-              setMessage("");
-              setRescheduleDate(bookingData.date);
-              setRescheduleTime(bookingData.time);
-            }}
-            className="btn-cta flex-1"
-          >
-            Reschedule
-          </button>
-          <button
-            type="button"
-            onClick={handleCancel}
-            disabled={status === "loading"}
-            className="btn-outline btn-outline-danger flex-1"
-          >
-            {status === "loading" ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              "Cancel"
-            )}
-          </button>
+            <button
+              type="button"
+              onClick={handleCancel}
+              disabled={status === "loading"}
+              className={`manage-action-btn manage-action-btn-danger ${
+                canLateNotice && !bookingData.lateNoticeAt ? "sm:col-span-2" : ""
+              }`}
+            >
+              {status === "loading" ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                "Cancel appointment"
+              )}
+            </button>
+          </div>
         </div>
       )}
 
@@ -382,22 +391,22 @@ export function ManageAppointment({ initialBooking }: ManageAppointmentProps) {
               rescheduleDate.length > 0 && (dateClosed || (!slotsLoading && !hasAvailableSlot))
             }
           />
-          <div className="flex gap-3">
+          <div className="manage-action-grid">
             <button
               type="submit"
               disabled={status === "loading" || cannotPickTime || !rescheduleTime}
-              className="btn-cta flex-1"
+              className="manage-action-btn manage-action-btn-primary sm:col-span-2"
             >
               {status === "loading" ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
-                "Confirm"
+                "Confirm new time"
               )}
             </button>
             <button
               type="button"
               onClick={() => setMode("view")}
-              className="btn-outline flex-1"
+              className="manage-action-btn manage-action-btn-secondary sm:col-span-2"
             >
               Back
             </button>
@@ -443,15 +452,23 @@ export function ManageAppointment({ initialBooking }: ManageAppointmentProps) {
               placeholder="Stuck in traffic, etc."
             />
           </div>
-          <div className="flex gap-3">
-            <button type="submit" disabled={status === "loading"} className="btn-cta flex-1">
+          <div className="manage-action-grid">
+            <button
+              type="submit"
+              disabled={status === "loading"}
+              className="manage-action-btn manage-action-btn-primary sm:col-span-2"
+            >
               {status === "loading" ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
                 "Notify clinic"
               )}
             </button>
-            <button type="button" onClick={() => setMode("view")} className="btn-outline flex-1">
+            <button
+              type="button"
+              onClick={() => setMode("view")}
+              className="manage-action-btn manage-action-btn-secondary sm:col-span-2"
+            >
               Back
             </button>
           </div>
