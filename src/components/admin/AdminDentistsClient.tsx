@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type FormEvent } from "react";
-import { Loader2, Mail, Trash2, UserPlus, XCircle } from "lucide-react";
+import { Check, Copy, Loader2, Mail, Trash2, UserPlus, XCircle } from "lucide-react";
 import { AdminEmptyState, AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import type { ClinicDentist } from "@/lib/dentists";
 import type { DentistInvite } from "@/lib/admin-invites-store";
@@ -24,6 +24,37 @@ function formatInviteExpiry(expiresAt: string): string {
     day: "numeric",
     year: "numeric",
   });
+}
+
+function buildAcceptInviteUrl(token: string): string {
+  if (typeof window === "undefined") return "";
+  return `${window.location.origin}/admin/accept-invite?token=${encodeURIComponent(token)}`;
+}
+
+function CopyInviteLinkButton({ token }: { token: string }) {
+  const [copied, setCopied] = useState(false);
+  const url = buildAcceptInviteUrl(token);
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      window.prompt("Copy this invite link:", url);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={copyLink}
+      className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100"
+    >
+      {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+      {copied ? "Copied" : "Copy invite link"}
+    </button>
+  );
 }
 
 export function AdminDentistsClient({
@@ -131,8 +162,9 @@ export function AdminDentistsClient({
       }
 
       setMessage(
-        data.warning ??
-          `Invite sent to ${email}. They can set their own password from the email link.`
+        data.warning
+          ? `${data.warning} You can copy the invite link below and send it directly.`
+          : `Invite ready for ${email}. Email sent if SMTP is configured — you can also copy the link below immediately.`
       );
     } catch {
       setError("Failed to send invite.");
@@ -241,7 +273,11 @@ export function AdminDentistsClient({
                         <p className="text-amber-800">
                           {invite.email} · expires {formatInviteExpiry(invite.expiresAt)}
                         </p>
+                        <p className="mt-1 text-xs text-amber-800/80">
+                          Share the link right away — email delivery can take a few minutes.
+                        </p>
                       </div>
+                      <CopyInviteLinkButton token={invite.token} />
                       <button
                         type="button"
                         onClick={() => revokeInvite(invite.token)}

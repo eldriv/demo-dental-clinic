@@ -10,7 +10,7 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const created = searchParams.get("created") === "1";
   const isDev = process.env.NODE_ENV === "development";
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(searchParams.get("email") ?? "");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -87,7 +87,8 @@ function LoginForm() {
 
           {created && (
             <div className="mb-4 rounded-xl border border-primary/15 bg-primary/5 px-3 py-2 text-sm text-primary">
-              Your dentist account is ready. Sign in below.
+              Your dentist account is ready. Sign in below with the same email you used for the
+              invite{email ? ` (${email})` : ""}.
             </div>
           )}
 

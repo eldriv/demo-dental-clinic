@@ -73,15 +73,58 @@ function envPasswordForAccountId(accountId: string): string | undefined {
   return process.env[envKey];
 }
 
+function resolveOwnerEmail(isProduction: boolean): string | undefined {
+  if (!isProduction) return "owner";
+  return (
+    process.env.ADMIN_OWNER_EMAIL?.trim().toLowerCase() ||
+    process.env.CLINIC_EMAIL?.trim().toLowerCase()
+  );
+}
+
+function resolveStaffEmail(isProduction: boolean): string | undefined {
+  if (!isProduction) return "staff";
+  return process.env.ADMIN_STAFF_EMAIL?.trim().toLowerCase();
+}
+
+async function migrateLegacyAdminEmails(
+  accounts: StoredAdminAccount[]
+): Promise<StoredAdminAccount[]> {
+  if (process.env.NODE_ENV !== "production") return accounts;
+
+  let changed = false;
+  const next = accounts.map((account) => {
+    if (account.id === "owner" && !account.email.includes("@")) {
+      const newEmail = resolveOwnerEmail(true);
+      if (newEmail?.includes("@")) {
+        changed = true;
+        return { ...account, email: newEmail };
+      }
+    }
+    if (account.id === "staff" && !account.email.includes("@")) {
+      const newEmail = resolveStaffEmail(true);
+      if (newEmail?.includes("@")) {
+        changed = true;
+        return { ...account, email: newEmail };
+      }
+    }
+    return account;
+  });
+
+  if (changed) {
+    await writeStoredAccounts(next);
+    accountsPromise = Promise.resolve(next);
+  }
+
+  return next;
+}
+
 async function buildBootstrapAccounts(): Promise<StoredAdminAccount[]> {
   const now = new Date().toISOString();
   const accounts: StoredAdminAccount[] = [];
   const isProduction = process.env.NODE_ENV === "production";
 
   const ownerPassword = process.env.ADMIN_PASSWORD;
-  const ownerEmail = isProduction
-    ? process.env.ADMIN_OWNER_EMAIL?.trim().toLowerCase()
-    : "owner";
+  const ownerEmail = resolveOwnerEmail(isProduction);
 
   if (ownerPassword && ownerEmail) {
     if (isProduction && !ownerEmail.includes("@")) {
@@ -110,9 +153,7 @@ async function buildBootstrapAccounts(): Promise<StoredAdminAccount[]> {
   }
 
   const staffPassword = process.env.ADMIN_PASSWORD_STAFF;
-  const staffEmail = isProduction
-    ? process.env.ADMIN_STAFF_EMAIL?.trim().toLowerCase()
-    : "staff";
+  const staffEmail = resolveStaffEmail(isProduction);
 
   if (staffPassword && staffEmail) {
     if (isProduction && !staffEmail.includes("@")) {
@@ -206,7 +247,8 @@ export async function getAllAdminAccounts(): Promise<StoredAdminAccount[]> {
     accountsPromise = (async () => {
       const stored = await readStoredAccounts();
       if (stored.length > 0) {
-        return ensureDevDentistSeeds(stored);
+        const migrated = await migrateLegacyAdminEmails(stored);
+        return ensureDevDentistSeeds(migrated);
       }
 
       const seeded = await buildBootstrapAccounts();

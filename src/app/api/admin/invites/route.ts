@@ -47,12 +47,16 @@ export async function POST(request: Request) {
 
     if (result.error) {
       const status = result.invite ? 200 : 400;
+      const acceptUrl = result.invite
+        ? `${getSiteUrlFromRequest(request)}/admin/accept-invite?token=${encodeURIComponent(result.invite.token)}`
+        : undefined;
       return NextResponse.json(
         {
           success: Boolean(result.invite),
           invite: result.invite,
+          acceptUrl,
           warning: result.error,
-          emailSent: !result.error?.includes("email"),
+          emailSent: result.error ? false : true,
         },
         { status }
       );
@@ -61,6 +65,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       invite: result.invite,
+      acceptUrl: `${getSiteUrlFromRequest(request)}/admin/accept-invite?token=${encodeURIComponent(result.invite!.token)}`,
       emailSent: true,
     });
   } catch {

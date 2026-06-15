@@ -99,11 +99,13 @@ export function isLoginRateLimited(entry: LoginAttemptEntry | undefined, now = D
 }
 
 export async function checkLoginRateLimit(ip: string): Promise<boolean> {
+  if (process.env.NODE_ENV !== "production") return false;
   const store = await readAttempts();
   return isLoginRateLimited(store[ip]);
 }
 
 export async function recordFailedLoginAttempt(ip: string): Promise<void> {
+  if (process.env.NODE_ENV !== "production") return;
   const store = await readAttempts();
   const now = Date.now();
   const current = store[ip] ?? { failures: [] };

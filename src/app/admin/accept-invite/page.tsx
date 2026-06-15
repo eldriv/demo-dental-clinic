@@ -68,7 +68,14 @@ function AcceptInviteForm() {
         return;
       }
 
-      router.push("/admin/login?created=1");
+      if (!invite) {
+        setError("Invite details missing. Please open the invite link again.");
+        return;
+      }
+
+      router.push(
+        `/admin/login?created=1&email=${encodeURIComponent(invite.email)}`
+      );
       router.refresh();
     } catch {
       setError("Failed to create account.");
