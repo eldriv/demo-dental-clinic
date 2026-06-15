@@ -9,6 +9,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const created = searchParams.get("created") === "1";
+  const isDev = process.env.NODE_ENV === "development";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -27,7 +28,7 @@ function LoginForm() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Login failed.");
+        setError(data.error ?? "Invalid email or password.");
         return;
       }
 
@@ -93,17 +94,18 @@ function LoginForm() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-gray-700">
-                Email or account ID
+                Work email
               </label>
               <input
                 id="email"
-                type="text"
+                type={isDev ? "text" : "email"}
+                inputMode="email"
                 required
                 autoComplete="username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="input-field"
-                placeholder="you@clinic.ph or owner"
+                placeholder={isDev ? "owner or you@clinic.ph" : "you@clinic.ph"}
               />
             </div>
 
@@ -141,9 +143,10 @@ function LoginForm() {
 
           {process.env.NODE_ENV === "development" && (
             <p className="mt-4 text-xs leading-relaxed text-muted">
-              Local dev: owner/staff <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-[11px]">smilecare2026</code>
-              {" · "}seeded dentists <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-[11px]">dr-chen</code> /{" "}
-              <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-[11px]">dentist2026</code>
+              Local dev only: use <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-[11px]">owner</code> /{" "}
+              <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-[11px]">staff</code> with{" "}
+              <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-[11px]">smilecare2026</code>
+              , or invited dentist emails.
             </p>
           )}
         </div>

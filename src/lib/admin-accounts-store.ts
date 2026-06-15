@@ -76,9 +76,28 @@ function envPasswordForAccountId(accountId: string): string | undefined {
 async function buildBootstrapAccounts(): Promise<StoredAdminAccount[]> {
   const now = new Date().toISOString();
   const accounts: StoredAdminAccount[] = [];
+  const isProduction = process.env.NODE_ENV === "production";
 
   const ownerPassword = process.env.ADMIN_PASSWORD;
-  if (ownerPassword || process.env.NODE_ENV !== "production") {
+  const ownerEmail = isProduction
+    ? process.env.ADMIN_OWNER_EMAIL?.trim().toLowerCase()
+    : "owner";
+
+  if (ownerPassword && ownerEmail) {
+    if (isProduction && !ownerEmail.includes("@")) {
+      throw new Error("ADMIN_OWNER_EMAIL must be a valid email in production.");
+    }
+
+    accounts.push({
+      id: "owner",
+      email: ownerEmail,
+      name: "Clinic Owner",
+      role: "owner",
+      passwordHash: await hashAdminPassword(ownerPassword),
+      createdAt: now,
+      status: "active",
+    });
+  } else if (!isProduction) {
     accounts.push({
       id: "owner",
       email: "owner",
@@ -91,7 +110,25 @@ async function buildBootstrapAccounts(): Promise<StoredAdminAccount[]> {
   }
 
   const staffPassword = process.env.ADMIN_PASSWORD_STAFF;
-  if (staffPassword || process.env.NODE_ENV !== "production") {
+  const staffEmail = isProduction
+    ? process.env.ADMIN_STAFF_EMAIL?.trim().toLowerCase()
+    : "staff";
+
+  if (staffPassword && staffEmail) {
+    if (isProduction && !staffEmail.includes("@")) {
+      throw new Error("ADMIN_STAFF_EMAIL must be a valid email in production.");
+    }
+
+    accounts.push({
+      id: "staff",
+      email: staffEmail,
+      name: "Front Desk",
+      role: "staff",
+      passwordHash: await hashAdminPassword(staffPassword),
+      createdAt: now,
+      status: "active",
+    });
+  } else if (!isProduction) {
     accounts.push({
       id: "staff",
       email: "staff",

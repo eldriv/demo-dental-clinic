@@ -20,6 +20,13 @@ cp .env.example .env.local
 | `SMTP_PASS` | Gmail App Password (not your regular password) |
 | `CLINIC_EMAIL` | Email address that receives booking notifications |
 | `CLINIC_TIMEZONE` | IANA timezone for slots (e.g. `Asia/Manila`) |
+| `ADMIN_SECRET` | Long random string for signing admin sessions |
+| `ADMIN_OWNER_EMAIL` | Owner login email (production; required with `ADMIN_PASSWORD`) |
+| `ADMIN_STAFF_EMAIL` | Front desk login email (production; required with `ADMIN_PASSWORD_STAFF`) |
+| `ADMIN_PASSWORD` | Owner dashboard password |
+| `ADMIN_PASSWORD_STAFF` | Front desk dashboard password |
+
+Admin login is rate-limited (5 failed attempts per 15 minutes per IP). In production, owner and staff must sign in with their **work email**, not short IDs like `owner` or `staff`.
 
 ## 2. Gmail SMTP Setup
 
