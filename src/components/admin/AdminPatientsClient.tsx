@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   Calendar,
@@ -16,6 +17,7 @@ import {
 } from "lucide-react";
 import type { Booking } from "@/lib/bookings";
 import type { PatientClinicStatus, PatientRecord, PatientSummary } from "@/lib/patient-profile";
+import { getPatientServiceOnBooking } from "@/lib/booking-group";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { formatBookingWhen } from "@/components/admin/StatusBadge";
 
@@ -118,7 +120,8 @@ function PatientDetailPanel({
           <div className="min-w-0">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-green-800">Upcoming</p>
             <p className="text-xs text-green-900">
-              {patient.upcoming.service} · {formatBookingWhen(patient.upcoming)}
+              {getPatientServiceOnBooking(patient.upcoming, patient.email)} ·{" "}
+              {formatBookingWhen(patient.upcoming)}
             </p>
           </div>
         </div>
@@ -195,6 +198,7 @@ function PatientListPlaceholder() {
 }
 
 export function AdminPatientsClient({ initialPatients }: AdminPatientsClientProps) {
+  const searchParams = useSearchParams();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [selectedEmail, setSelectedEmail] = useState<string | null>(null);
@@ -244,6 +248,13 @@ export function AdminPatientsClient({ initialPatients }: AdminPatientsClientProp
     setSelectedEmail(null);
     setDetail(null);
   }
+
+  useEffect(() => {
+    const emailFromUrl = searchParams.get("email")?.trim().toLowerCase();
+    if (!emailFromUrl) return;
+    dismissedDetailRef.current = false;
+    void openPatient(emailFromUrl);
+  }, [searchParams]);
 
   useEffect(() => {
     if (filtered.length === 0) {

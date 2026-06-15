@@ -1,4 +1,5 @@
 import type { Booking, GroupAttendee, StaffCreateBookingInput } from "./bookings";
+import { BOOKING_VALIDATION } from "./bookings";
 import type { ClinicOperatingSettings } from "./clinic-settings";
 import { generateTimeSlots, isAppointmentSlotInPast, isOperatingDay, isValidTimeSlot } from "./clinic-settings";
 import { getClinicTodayString } from "./clinic-timezone";
@@ -56,9 +57,56 @@ export function formatBookingDisplayName(booking: Booking): string {
   return booking.name;
 }
 
+export function getAttendeeForEmail(
+  booking: Pick<Booking, "attendees" | "email">,
+  email: string
+): GroupAttendee | undefined {
+  const normalized = email.trim().toLowerCase();
+  return (booking.attendees ?? []).find(
+    (attendee) => attendee.email?.trim().toLowerCase() === normalized
+  );
+}
+
+export function isOrganizerEmail(
+  booking: Pick<Booking, "email">,
+  patientEmail: string
+): boolean {
+  return booking.email.trim().toLowerCase() === patientEmail.trim().toLowerCase();
+}
+
+export function getPatientNameOnBooking(
+  booking: Booking,
+  patientEmail: string
+): string {
+  if (isOrganizerEmail(booking, patientEmail)) return booking.name;
+  return getAttendeeForEmail(booking, patientEmail)?.name ?? booking.name;
+}
+
+export function getPatientPhoneOnBooking(
+  booking: Booking,
+  patientEmail: string
+): string {
+  if (isOrganizerEmail(booking, patientEmail)) return booking.phone;
+  return getAttendeeForEmail(booking, patientEmail)?.phone?.trim() ?? "";
+}
+
+export function getPatientServiceOnBooking(
+  booking: Booking,
+  patientEmail: string
+): string {
+  const attendee = getAttendeeForEmail(booking, patientEmail);
+  if (attendee?.service) {
+    return isGroupBooking(booking) ? `${attendee.service} (group)` : attendee.service;
+  }
+  return formatBookingServiceLabel(booking);
+}
+
 export function formatGroupAttendeesList(booking: Pick<Booking, "attendees">): string {
   return (booking.attendees ?? [])
-    .map((attendee) => `${attendee.name} — ${attendee.service}`)
+    .map((attendee) => {
+      const contact = attendee.email ? ` · ${attendee.email}` : "";
+      return `${attendee.name} — ${attendee.service}${contact}`;
+    })
     .join("\n");
 }
 
@@ -80,12 +128,25 @@ export function validateGroupAttendees(attendees: GroupAttendee[] | undefined): 
     return `Add at least ${GROUP_BOOKING_MIN_PARTY} patients for a group appointment.`;
   }
 
+  const seenEmails = new Set<string>();
+
   for (const [index, attendee] of attendees.entries()) {
     if (!attendee.name?.trim() || attendee.name.trim().length < 2) {
       return `Patient ${index + 1} needs a valid name.`;
     }
     if (!attendee.service?.trim()) {
       return `Select a service for ${attendee.name.trim() || `patient ${index + 1}`}.`;
+    }
+    const email = attendee.email?.trim().toLowerCase() ?? "";
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return `Enter a valid email for ${attendee.name.trim() || `patient ${index + 1}`}.`;
+    }
+    if (seenEmails.has(email)) {
+      return `Each patient in a group needs a unique email (${email} is duplicated).`;
+    }
+    seenEmails.add(email);
+    if (attendee.phone?.trim() && attendee.phone.trim().length < BOOKING_VALIDATION.phone.min) {
+      return `Enter a valid phone for ${attendee.name.trim()}.`;
     }
   }
 
@@ -204,6 +265,8 @@ export function normalizeStaffGroupBookingInput(
   const attendees = (body.attendees ?? []).map((attendee) => ({
     name: attendee.name.trim(),
     service: attendee.service.trim(),
+    email: attendee.email.trim().toLowerCase(),
+    phone: attendee.phone?.trim() || undefined,
   }));
 
   const attendeeError = validateGroupAttendees(attendees);

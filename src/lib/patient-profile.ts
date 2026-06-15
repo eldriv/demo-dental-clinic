@@ -1,6 +1,12 @@
 import type { Booking } from "./bookings";
 import { sortBookingsByDateTime } from "./admin-booking-filters";
 import { getBookingStatusLabel } from "./booking-status";
+import {
+  getPatientNameOnBooking,
+  getPatientPhoneOnBooking,
+  getPatientServiceOnBooking,
+  isGroupBooking,
+} from "./booking-group";
 
 export type PatientClinicStatus = "new" | "returning";
 
@@ -60,16 +66,32 @@ function isCountableBooking(booking: Booking): boolean {
   return booking.status !== "cancelled" && booking.status !== "declined";
 }
 
+function addPatientBooking(groups: Map<string, Booking[]>, email: string, booking: Booking) {
+  const existing = groups.get(email) ?? [];
+  if (!existing.some((entry) => entry.token === booking.token)) {
+    existing.push(booking);
+    groups.set(email, existing);
+  }
+}
+
 export function groupBookingsByPatient(bookings: Booking[]): Map<string, Booking[]> {
   const groups = new Map<string, Booking[]>();
 
   for (const booking of bookings) {
     if (!isCountableBooking(booking)) continue;
-    const email = normalizeEmail(booking.email);
-    if (!email) continue;
-    const existing = groups.get(email) ?? [];
-    existing.push(booking);
-    groups.set(email, existing);
+
+    const organizerEmail = normalizeEmail(booking.email);
+    if (organizerEmail) {
+      addPatientBooking(groups, organizerEmail, booking);
+    }
+
+    if (isGroupBooking(booking)) {
+      for (const attendee of booking.attendees ?? []) {
+        const attendeeEmail = normalizeEmail(attendee.email ?? "");
+        if (!attendeeEmail) continue;
+        addPatientBooking(groups, attendeeEmail, booking);
+      }
+    }
   }
 
   for (const [email, patientBookings] of groups) {
@@ -79,8 +101,22 @@ export function groupBookingsByPatient(bookings: Booking[]): Map<string, Booking
   return groups;
 }
 
+function resolvePatientContact(
+  email: string,
+  patientBookings: Booking[]
+): { name: string; phone: string } {
+  for (let index = patientBookings.length - 1; index >= 0; index -= 1) {
+    const booking = patientBookings[index];
+    const name = getPatientNameOnBooking(booking, email);
+    const phone = getPatientPhoneOnBooking(booking, email);
+    if (name) return { name, phone };
+  }
+
+  return { name: email, phone: "" };
+}
+
 function buildPatientSummary(email: string, patientBookings: Booking[]): PatientSummary {
-  const latest = patientBookings[patientBookings.length - 1];
+  const contact = resolvePatientContact(email, patientBookings);
   const completed = patientBookings.filter((booking) => booking.status === "completed");
   const today = new Date().toISOString().slice(0, 10);
   const upcoming = patientBookings.find(
@@ -91,19 +127,21 @@ function buildPatientSummary(email: string, patientBookings: Booking[]): Patient
       booking.date >= today
   );
   const treatments = [
-    ...new Set(completed.map((booking) => booking.service).filter(Boolean)),
+    ...new Set(
+      completed.map((booking) => getPatientServiceOnBooking(booking, email)).filter(Boolean)
+    ),
   ];
-  const clinicalNotes = extractClinicalNotes(patientBookings);
+  const clinicalNotes = extractClinicalNotes(patientBookings, email);
 
   return {
     email,
-    name: latest.name,
-    phone: latest.phone,
+    name: contact.name,
+    phone: contact.phone,
     visitCount: completed.length,
     clinicStatus: completed.length === 0 ? "new" : "returning",
     totalAppointments: patientBookings.length,
     firstSeenAt: patientBookings[0].createdAt,
-    lastSeenAt: latest.updatedAt,
+    lastSeenAt: patientBookings[patientBookings.length - 1].updatedAt,
     lastVisit: completed[completed.length - 1],
     upcoming,
     history: patientBookings.slice(-5).reverse(),
@@ -113,11 +151,11 @@ function buildPatientSummary(email: string, patientBookings: Booking[]): Patient
   };
 }
 
-function toTreatment(booking: Booking): PatientTreatment {
+function toTreatment(booking: Booking, patientEmail: string): PatientTreatment {
   return {
     date: booking.date,
     time: booking.time,
-    service: booking.service,
+    service: getPatientServiceOnBooking(booking, patientEmail),
     status: booking.status,
     statusLabel: getBookingStatusLabel(booking),
     dentist: booking.assignedDentistName ?? booking.preferredDentistName,
@@ -127,13 +165,16 @@ function toTreatment(booking: Booking): PatientTreatment {
   };
 }
 
-function extractClinicalNotes(patientBookings: Booking[]): PatientClinicalNote[] {
+function extractClinicalNotes(
+  patientBookings: Booking[],
+  patientEmail: string
+): PatientClinicalNote[] {
   return patientBookings
     .filter((booking) => booking.status === "completed" && booking.visitNotes?.trim())
     .map((booking) => ({
       date: booking.date,
       time: booking.time,
-      service: booking.service,
+      service: getPatientServiceOnBooking(booking, patientEmail),
       dentist: booking.assignedDentistName ?? booking.preferredDentistName,
       note: booking.visitNotes!.trim(),
       token: booking.token,
@@ -173,13 +214,13 @@ export function getPatientRecord(bookings: Booking[], email: string): PatientRec
 
   const summary = buildPatientSummary(normalized, patientBookings);
   const completedVisits = patientBookings.filter((booking) => booking.status === "completed");
-  const clinicalNotes = extractClinicalNotes(patientBookings);
+  const clinicalNotes = extractClinicalNotes(patientBookings, normalized);
 
   return {
     ...summary,
     completedVisits,
     fullHistory: [...patientBookings].reverse(),
-    treatmentHistory: [...patientBookings].reverse().map(toTreatment),
+    treatmentHistory: [...patientBookings].reverse().map((booking) => toTreatment(booking, normalized)),
     clinicalNotes,
   };
 }
@@ -229,15 +270,31 @@ export function findPatientByEmailPrefix(
   const profiles: PatientSummary[] = [];
 
   for (const booking of bookings) {
-    const email = normalizeEmail(booking.email);
-    if (!email.includes(normalized) && !booking.name.toLowerCase().includes(normalized)) {
-      continue;
+    const candidates: Array<{ email: string; name: string }> = [
+      { email: normalizeEmail(booking.email), name: booking.name },
+    ];
+
+    if (isGroupBooking(booking)) {
+      for (const attendee of booking.attendees ?? []) {
+        const email = normalizeEmail(attendee.email ?? "");
+        if (email) candidates.push({ email, name: attendee.name });
+      }
     }
-    if (seen.has(email)) continue;
-    seen.add(email);
-    const profile = getPatientRecord(bookings, email);
-    if (profile) profiles.push(profile);
-    if (profiles.length >= limit) break;
+
+    for (const candidate of candidates) {
+      if (!candidate.email) continue;
+      if (
+        !candidate.email.includes(normalized) &&
+        !candidate.name.toLowerCase().includes(normalized)
+      ) {
+        continue;
+      }
+      if (seen.has(candidate.email)) continue;
+      seen.add(candidate.email);
+      const profile = getPatientRecord(bookings, candidate.email);
+      if (profile) profiles.push(profile);
+      if (profiles.length >= limit) return profiles;
+    }
   }
 
   return profiles;

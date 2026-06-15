@@ -45,30 +45,30 @@ function ActionButton({
   children,
   onClick,
   disabled,
-  variant = "outline",
+  variant = "secondary",
   loading,
   className = "",
 }: {
   children: React.ReactNode;
   onClick: () => void;
   disabled?: boolean;
-  variant?: "primary" | "outline" | "danger";
+  variant?: "primary" | "secondary" | "danger";
   loading?: boolean;
   className?: string;
 }) {
-  const base =
+  const variantClass =
     variant === "primary"
-      ? "btn-cta btn-cta-sm"
+      ? "admin-appt-btn-primary"
       : variant === "danger"
-        ? "btn-outline btn-cta-sm btn-outline-danger"
-        : "btn-outline btn-cta-sm";
+        ? "admin-appt-btn-danger"
+        : "admin-appt-btn-secondary";
 
   return (
     <button
       type="button"
       disabled={disabled || loading}
       onClick={onClick}
-      className={`${base} ${className}`}
+      className={`admin-appt-btn ${variantClass} ${className}`}
     >
       {loading ? <Loader2 className="size-3.5 animate-spin" /> : children}
     </button>
@@ -224,25 +224,24 @@ export function AppointmentCard({ booking, onUpdated }: AppointmentCardProps) {
 
         <div className="admin-appt-compact-actions">
           {canComplete && !expanded && (
-            <ActionButton
-              variant="primary"
-              loading={loading === "complete"}
+            <button
+              type="button"
+              disabled={loading === "complete"}
               onClick={() => runAction("complete")}
-              className="px-2.5! py-1! text-xs"
+              className="admin-appt-btn admin-appt-btn-primary px-2.5! py-1! text-[11px]"
             >
-              Done
-            </ActionButton>
+              {loading === "complete" ? <Loader2 className="size-3 animate-spin" /> : "Done"}
+            </button>
           )}
           {canApprove && !expanded && (
-            <ActionButton
-              variant="primary"
-              loading={loading === "approve"}
+            <button
+              type="button"
               disabled={dentistsLoading || !assignedDentistId}
               onClick={() => setExpanded(true)}
-              className="px-2.5! py-1! text-xs"
+              className="admin-appt-btn admin-appt-btn-primary px-2.5! py-1! text-[11px]"
             >
               Review
-            </ActionButton>
+            </button>
           )}
           <a
             href={`tel:${booking.phone.replace(/[^\d+]/g, "")}`}
@@ -297,6 +296,44 @@ export function AppointmentCard({ booking, onUpdated }: AppointmentCardProps) {
             )}
           </div>
 
+          {isGroupBooking(booking) && (booking.attendees?.length ?? 0) > 0 && (
+            <div className="rounded-lg border border-gray-100 bg-surface/40 px-2.5 py-2 text-xs">
+              <p className="mb-1.5 font-medium text-slate-700">Group members</p>
+              <ul className="space-y-1 text-muted">
+                <li>
+                  <a
+                    href={`/admin/patients?email=${encodeURIComponent(booking.email)}`}
+                    className="font-medium text-primary hover:underline"
+                  >
+                    {booking.name}
+                  </a>
+                  <span> — organizer · {booking.email}</span>
+                </li>
+                {(booking.attendees ?? [])
+                  .filter(
+                    (attendee) =>
+                      attendee.email.trim().toLowerCase() !== booking.email.trim().toLowerCase()
+                  )
+                  .map((attendee) => (
+                  <li key={attendee.email}>
+                    <a
+                      href={`/admin/patients?email=${encodeURIComponent(attendee.email)}`}
+                      className="font-medium text-primary hover:underline"
+                    >
+                      {attendee.name}
+                    </a>
+                    <span>
+                      {" "}
+                      — {attendee.service}
+                      {attendee.email ? ` · ${attendee.email}` : ""}
+                      {attendee.phone ? ` · ${attendee.phone}` : ""}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {booking.internalNotes && (
             <p className="text-xs text-amber-900 bg-amber-50 rounded-lg px-2 py-1.5">
               Note: {booking.internalNotes}
@@ -311,28 +348,31 @@ export function AppointmentCard({ booking, onUpdated }: AppointmentCardProps) {
           )}
 
           {canApprove && (
-            <div className="flex flex-wrap items-end gap-2">
-              <div className="min-w-[140px] flex-1">
-                <label htmlFor={`dentist-${booking.token}`} className="admin-detail-label text-[10px]">
-                  Dentist
-                </label>
-                <select
-                  id={`dentist-${booking.token}`}
-                  value={assignedDentistId}
-                  onChange={(e) => setAssignedDentistId(e.target.value)}
-                  className="input-field mt-0.5 py-1.5 text-xs"
-                >
-                  <option value="">Select</option>
-                  {dentists.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
-                  ))}
-                </select>
-              </div>
-              <ActionButton variant="primary" loading={loading === "approve"} disabled={!assignedDentistId} onClick={() => runAction("approve")}>
+            <div className="admin-appt-dentist-bar">
+              <label htmlFor={`dentist-${booking.token}`}>Assign dentist</label>
+              <select
+                id={`dentist-${booking.token}`}
+                value={assignedDentistId}
+                onChange={(e) => setAssignedDentistId(e.target.value)}
+                className="admin-appt-dentist-select"
+              >
+                <option value="">Select dentist</option>
+                {dentists.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+              <ActionButton
+                variant="primary"
+                loading={loading === "approve"}
+                disabled={!assignedDentistId}
+                onClick={() => runAction("approve")}
+              >
                 Approve
               </ActionButton>
               {canDecline && !showDeclineForm && (
-                <ActionButton variant="outline" onClick={() => setShowDeclineForm(true)}>
+                <ActionButton variant="secondary" onClick={() => setShowDeclineForm(true)}>
                   Reschedule
                 </ActionButton>
               )}
@@ -352,83 +392,124 @@ export function AppointmentCard({ booking, onUpdated }: AppointmentCardProps) {
                 <ActionButton variant="danger" loading={loading === "decline"} onClick={() => runAction("decline")}>
                   Send
                 </ActionButton>
-                <ActionButton variant="outline" onClick={() => setShowDeclineForm(false)}>
+                <ActionButton variant="secondary" onClick={() => setShowDeclineForm(false)}>
                   Cancel
                 </ActionButton>
               </div>
             </div>
           )}
 
-          <div className="flex flex-wrap gap-1.5">
+          <div className="admin-appt-action-bar">
             {showNoShowAlert && (
-              <>
-                <ActionButton variant="primary" loading={loading === "confirm-attendance"} onClick={() => runAction("confirm-attendance")}>
+              <div className="admin-appt-action-row">
+                <ActionButton
+                  variant="primary"
+                  loading={loading === "confirm-attendance"}
+                  onClick={() => runAction("confirm-attendance")}
+                >
+                  <UserCheck className="size-3.5" />
                   Still coming
                 </ActionButton>
                 {canMarkNoShow && (
-                  <ActionButton variant="danger" loading={loading === "mark-no-show"} onClick={() => runAction("mark-no-show")}>
+                  <ActionButton
+                    variant="danger"
+                    loading={loading === "mark-no-show"}
+                    onClick={() => runAction("mark-no-show")}
+                  >
                     No-show
                   </ActionButton>
                 )}
-              </>
+              </div>
             )}
-            {canComplete && (
-              <ActionButton variant="primary" loading={loading === "complete"} onClick={() => runAction("complete")}>
-                <CheckCircle2 className="mr-1 inline size-3.5" />
-                Complete
-              </ActionButton>
-            )}
-            {!canApprove && canDecline && !showDeclineForm && (
-              <ActionButton variant="outline" onClick={() => setShowDeclineForm(true)}>
-                Reschedule
-              </ActionButton>
-            )}
+
+            <div className="admin-appt-action-row admin-appt-action-row-primary">
+              {canComplete && (
+                <ActionButton variant="primary" loading={loading === "complete"} onClick={() => runAction("complete")}>
+                  <CheckCircle2 className="size-3.5" />
+                  Complete
+                </ActionButton>
+              )}
+              {!canApprove && canDecline && !showDeclineForm && (
+                <ActionButton variant="secondary" onClick={() => setShowDeclineForm(true)}>
+                  Reschedule
+                </ActionButton>
+              )}
+              {!booking.followUpNeeded && canComplete && (
+                <ActionButton
+                  variant="secondary"
+                  loading={loading === "set-follow-up"}
+                  onClick={() => runAction("set-follow-up", { followUpNeeded: true })}
+                >
+                  <Flag className="size-3.5" />
+                  Follow-up
+                </ActionButton>
+              )}
+              {booking.followUpNeeded && (
+                <ActionButton
+                  variant="secondary"
+                  loading={loading === "set-follow-up"}
+                  onClick={() => runAction("set-follow-up", { followUpNeeded: false })}
+                >
+                  Clear follow-up
+                </ActionButton>
+              )}
+              {canCancel && (
+                <ActionButton variant="danger" loading={loading === "cancel"} onClick={() => runAction("cancel")}>
+                  Cancel
+                </ActionButton>
+              )}
+            </div>
+
             {canReassignDentist && (
-              <>
+              <div className="admin-appt-dentist-bar">
+                <label htmlFor={`reassign-${booking.token}`}>Dentist</label>
                 <select
+                  id={`reassign-${booking.token}`}
                   value={assignedDentistId}
                   onChange={(e) => setAssignedDentistId(e.target.value)}
-                  className="input-field max-w-[140px] py-1.5 text-xs"
+                  className="admin-appt-dentist-select"
                 >
                   {dentists.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
                   ))}
                 </select>
                 <ActionButton
+                  variant="secondary"
                   loading={loading === "reassign-dentist"}
                   disabled={assignedDentistId === booking.assignedDentistId}
                   onClick={() => runAction("reassign-dentist")}
                 >
                   Change dentist
                 </ActionButton>
-              </>
+              </div>
             )}
-            {!booking.followUpNeeded && canComplete && (
-              <ActionButton loading={loading === "set-follow-up"} onClick={() => runAction("set-follow-up", { followUpNeeded: true })}>
-                Follow-up
-              </ActionButton>
-            )}
-            {booking.followUpNeeded && (
-              <ActionButton loading={loading === "set-follow-up"} onClick={() => runAction("set-follow-up", { followUpNeeded: false })}>
-                Clear follow-up
-              </ActionButton>
-            )}
-            {canCancel && (
-              <ActionButton variant="danger" loading={loading === "cancel"} onClick={() => runAction("cancel")}>
-                Cancel
-              </ActionButton>
-            )}
-            <a href={`/manage/${booking.token}`} target="_blank" rel="noreferrer" className="admin-appt-icon-btn" title="Patient view">
-              <ExternalLink className="size-3.5" />
-            </a>
-            <a href={`mailto:${booking.email}`} className="admin-appt-icon-btn" title="Email">
-              <Mail className="size-3.5" />
-            </a>
+
+            <div className="admin-appt-action-links">
+              <a
+                href={`/manage/${booking.token}`}
+                target="_blank"
+                rel="noreferrer"
+                className="admin-appt-quicklink"
+              >
+                <ExternalLink className="size-3.5" />
+                Patient view
+              </a>
+              <a href={`tel:${booking.phone.replace(/[^\d+]/g, "")}`} className="admin-appt-quicklink">
+                <Phone className="size-3.5" />
+                Call
+              </a>
+              <a href={`mailto:${booking.email}`} className="admin-appt-quicklink">
+                <Mail className="size-3.5" />
+                Email
+              </a>
+            </div>
           </div>
 
-          <details className="text-xs text-muted">
-            <summary className="cursor-pointer font-medium text-slate-500">Notes &amp; log</summary>
-            <div className="mt-2 space-y-2">
+          <details className="admin-appt-details text-xs text-muted">
+            <summary className="admin-appt-details-summary">Notes &amp; log</summary>
+            <div className="admin-appt-details-body space-y-2">
               <textarea
                 value={internalNotes}
                 onChange={(e) => setInternalNotes(e.target.value)}
@@ -436,7 +517,8 @@ export function AppointmentCard({ booking, onUpdated }: AppointmentCardProps) {
                 className="input-field text-xs"
                 placeholder="Staff-only note"
               />
-              <ActionButton
+            <ActionButton
+                variant="secondary"
                 loading={loading === "update-internal-notes"}
                 disabled={internalNotes === (booking.internalNotes ?? "")}
                 onClick={() => runAction("update-internal-notes")}

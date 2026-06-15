@@ -36,8 +36,8 @@ export function AdminStaffBookingForm() {
   const [isGroup, setIsGroup] = useState(false);
   const [endTime, setEndTime] = useState("");
   const [attendees, setAttendees] = useState<GroupAttendee[]>([
-    { name: "", service: "" },
-    { name: "", service: "" },
+    { name: "", service: "", email: "", phone: "" },
+    { name: "", service: "", email: "", phone: "" },
   ]);
 
   useEffect(() => {
@@ -126,8 +126,8 @@ export function AdminStaffBookingForm() {
     setShowNotes(false);
     if (isGroup) {
       setAttendees([
-        { name: "", service: "" },
-        { name: "", service: "" },
+        { name: "", service: "", email: "", phone: "" },
+        { name: "", service: "", email: "", phone: "" },
       ]);
     }
   }
@@ -139,7 +139,7 @@ export function AdminStaffBookingForm() {
   }
 
   function addAttendee() {
-    setAttendees((rows) => [...rows, { name: "", service: "" }]);
+    setAttendees((rows) => [...rows, { name: "", service: "", email: "", phone: "" }]);
   }
 
   function removeAttendee(index: number) {
@@ -212,9 +212,15 @@ export function AdminStaffBookingForm() {
   const startSlotIndex = timeSlots.findIndex((slot) => slot.time === selectedTime);
   const endTimeOptions =
     startSlotIndex >= 0 ? timeSlots.slice(startSlotIndex + 1).map((slot) => slot.time) : [];
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const attendeesValid =
     attendees.length >= GROUP_BOOKING_MIN_PARTY &&
-    attendees.every((row) => row.name.trim().length >= 2 && row.service.trim());
+    attendees.every(
+      (row) =>
+        row.name.trim().length >= 2 &&
+        row.service.trim() &&
+        emailPattern.test(row.email.trim())
+    );
   const canSubmit = Boolean(
     assignedDentistId &&
       name &&
@@ -236,8 +242,8 @@ export function AdminStaffBookingForm() {
             setEndTime("");
             if (next) {
               setAttendees([
-                { name: "", service: "" },
-                { name: "", service: "" },
+                { name: "", service: "", email: "", phone: "" },
+                { name: "", service: "", email: "", phone: "" },
               ]);
             }
           }}
@@ -403,42 +409,64 @@ export function AdminStaffBookingForm() {
                 </button>
               </div>
               {attendees.map((attendee, index) => (
-                <div key={index} className="grid gap-2 rounded-lg border border-gray-100 bg-white p-2 sm:grid-cols-[1fr_1fr_auto]">
-                  <div>
-                    <label className="admin-book-label">Name</label>
-                    <input
-                      required
-                      value={attendee.name}
-                      onChange={(e) => updateAttendee(index, "name", e.target.value)}
-                      className="input-field py-2 text-sm"
-                      placeholder={`Patient ${index + 1}`}
-                    />
+                <div key={index} className="space-y-2 rounded-lg border border-gray-100 bg-white p-2">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <label className="admin-book-label">Name</label>
+                      <input
+                        required
+                        value={attendee.name}
+                        onChange={(e) => updateAttendee(index, "name", e.target.value)}
+                        className="input-field py-2 text-sm"
+                        placeholder={`Patient ${index + 1}`}
+                      />
+                    </div>
+                    <div>
+                      <label className="admin-book-label">Email</label>
+                      <input
+                        required
+                        type="email"
+                        value={attendee.email}
+                        onChange={(e) => updateAttendee(index, "email", e.target.value)}
+                        className="input-field py-2 text-sm"
+                        placeholder="email@example.com"
+                      />
+                    </div>
+                    <div>
+                      <label className="admin-book-label">Phone (optional)</label>
+                      <input
+                        value={attendee.phone ?? ""}
+                        onChange={(e) => updateAttendee(index, "phone", e.target.value)}
+                        className="input-field py-2 text-sm"
+                        placeholder="09xx xxx xxxx"
+                      />
+                    </div>
+                    <div>
+                      <label className="admin-book-label">Service</label>
+                      <select
+                        required
+                        value={attendee.service}
+                        onChange={(e) => updateAttendee(index, "service", e.target.value)}
+                        className="input-field py-2 text-sm"
+                      >
+                        <option value="">Select service</option>
+                        {services.map((s) => (
+                          <option key={s.id} value={s.name}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
-                  <div>
-                    <label className="admin-book-label">Service</label>
-                    <select
-                      required
-                      value={attendee.service}
-                      onChange={(e) => updateAttendee(index, "service", e.target.value)}
-                      className="input-field py-2 text-sm"
-                    >
-                      <option value="">Select service</option>
-                      {services.map((s) => (
-                        <option key={s.id} value={s.name}>
-                          {s.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex items-end">
+                  <div className="flex justify-end">
                     <button
                       type="button"
                       onClick={() => removeAttendee(index)}
                       disabled={attendees.length <= GROUP_BOOKING_MIN_PARTY}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-muted hover:border-red-200 hover:text-red-600 disabled:opacity-40"
-                      aria-label={`Remove patient ${index + 1}`}
+                      className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-xs text-muted hover:border-red-200 hover:text-red-600 disabled:opacity-40"
                     >
                       <Trash2 className="size-3.5" />
+                      Remove
                     </button>
                   </div>
                 </div>
