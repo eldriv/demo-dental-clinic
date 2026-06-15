@@ -10,6 +10,11 @@ import type { Booking, StaffCreateBookingInput } from "@/lib/bookings";
 import { BOOKING_VALIDATION } from "@/lib/bookings";
 import { buildManageUrl } from "@/lib/site-url";
 import { validateSlotBooking, ANY_DENTIST_ID } from "@/lib/booking-availability";
+import {
+  isGroupBooking,
+  normalizeStaffGroupBookingInput,
+  validateGroupSlotBooking,
+} from "@/lib/booking-group";
 import { isAnyDentist } from "@/lib/dentist-availability";
 import { getAllDentists, getDentistById, isValidDentistId } from "@/lib/dentists-store";
 import { getClinicSettings } from "@/lib/clinic-settings-store";
@@ -80,16 +85,28 @@ export async function approveBooking(
     getAllDentists(),
   ]);
 
-  const slotError = validateSlotBooking({
-    date: booking.date,
-    time: booking.time,
-    settings,
-    bookings,
-    blocks,
-    dentists,
-    dentistId: assignedDentistId ?? ANY_DENTIST_ID,
-    excludeToken: token,
-  });
+  const slotError = isGroupBooking(booking)
+    ? validateGroupSlotBooking({
+        date: booking.date,
+        startTime: booking.time,
+        endTime: booking.endTime ?? booking.time,
+        settings,
+        bookings,
+        blocks,
+        dentists,
+        dentistId: assignedDentistId ?? ANY_DENTIST_ID,
+        excludeToken: token,
+      })
+    : validateSlotBooking({
+        date: booking.date,
+        time: booking.time,
+        settings,
+        bookings,
+        blocks,
+        dentists,
+        dentistId: assignedDentistId ?? ANY_DENTIST_ID,
+        excludeToken: token,
+      });
 
   if (slotError) {
     return { error: slotError };
@@ -406,9 +423,15 @@ function validateStaffBookingFields(body: StaffCreateBookingInput): string | nul
   if (!body.phone?.trim() || body.phone.trim().length < BOOKING_VALIDATION.phone.min) {
     return "Please provide a valid phone number.";
   }
-  if (!body.service?.trim()) return "Please select a service.";
   if (!body.date?.trim() || !body.time?.trim()) return "Please select date and time.";
   if (!body.assignedDentistId?.trim()) return "Please assign a dentist.";
+
+  if (body.bookingKind === "group") {
+    if (!body.endTime?.trim()) return "Please select an end time for the group block.";
+    return null;
+  }
+
+  if (!body.service?.trim()) return "Please select a service.";
   return null;
 }
 
@@ -420,7 +443,15 @@ export async function createStaffBooking(
   const fieldError = validateStaffBookingFields(body);
   if (fieldError) return { error: fieldError };
 
-  const assignedDentistId = body.assignedDentistId.trim();
+  const isGroup = body.bookingKind === "group";
+  let normalizedBody = body;
+  if (isGroup) {
+    const normalized = normalizeStaffGroupBookingInput(body);
+    if ("error" in normalized) return { error: normalized.error };
+    normalizedBody = normalized;
+  }
+
+  const assignedDentistId = normalizedBody.assignedDentistId.trim();
   if (!(await isValidDentistId(assignedDentistId))) {
     return { error: "Invalid dentist selected." };
   }
@@ -435,32 +466,51 @@ export async function createStaffBooking(
     getAllDentists(),
   ]);
 
-  const slotError = validateSlotBooking({
-    date: body.date,
-    time: body.time,
-    settings,
-    bookings,
-    blocks,
-    dentists,
-    dentistId: assignedDentistId,
-  });
+  const slotError = isGroup
+    ? validateGroupSlotBooking({
+        date: normalizedBody.date,
+        startTime: normalizedBody.time,
+        endTime: normalizedBody.endTime ?? normalizedBody.time,
+        settings,
+        bookings,
+        blocks,
+        dentists,
+        dentistId: assignedDentistId,
+      })
+    : validateSlotBooking({
+        date: normalizedBody.date,
+        time: normalizedBody.time,
+        settings,
+        bookings,
+        blocks,
+        dentists,
+        dentistId: assignedDentistId,
+      });
 
   if (slotError) return { error: slotError };
 
   const now = new Date().toISOString();
   const token = uuidv4();
-  const autoConfirm = body.autoConfirm !== false;
+  const autoConfirm = normalizedBody.autoConfirm !== false;
   const actor = options?.actor ?? "staff";
 
   const booking: Booking = {
     id: uuidv4(),
     token,
-    name: body.name.trim(),
-    email: body.email.trim().toLowerCase(),
-    phone: body.phone.trim(),
-    service: body.service.trim(),
-    date: body.date,
-    time: body.time,
+    name: normalizedBody.name.trim(),
+    email: normalizedBody.email.trim().toLowerCase(),
+    phone: normalizedBody.phone.trim(),
+    service: (isGroup ? normalizedBody.service : normalizedBody.service.trim()) ?? "",
+    date: normalizedBody.date,
+    time: normalizedBody.time,
+    ...(isGroup
+      ? {
+          bookingKind: "group" as const,
+          partySize: normalizedBody.partySize,
+          attendees: normalizedBody.attendees,
+          endTime: normalizedBody.endTime,
+        }
+      : {}),
     status: autoConfirm ? "confirmed" : "pending",
     source: "staff",
     createdAt: now,
@@ -469,13 +519,21 @@ export async function createStaffBooking(
     preferredDentistName: assignedDentist.name,
     assignedDentistId,
     assignedDentistName: assignedDentist.name,
-    internalNotes: body.internalNotes?.trim() || undefined,
+    internalNotes: normalizedBody.internalNotes?.trim() || undefined,
     auditLog: [
       {
         at: now,
         actor,
-        action: autoConfirm ? "staff-booking-confirmed" : "staff-booking-created",
-        detail: assignedDentist.name,
+        action: autoConfirm
+          ? isGroup
+            ? "staff-group-booking-confirmed"
+            : "staff-booking-confirmed"
+          : isGroup
+            ? "staff-group-booking-created"
+            : "staff-booking-created",
+        detail: isGroup
+          ? `${assignedDentist.name} · Group (${normalizedBody.partySize})`
+          : assignedDentist.name,
       },
     ],
   };

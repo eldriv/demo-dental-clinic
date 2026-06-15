@@ -12,10 +12,15 @@ import {
 import type { Booking } from "@/lib/bookings";
 import type { PatientClinicStatus } from "@/lib/patient-profile";
 import {
-  getAppointmentEnd,
+  getAppointmentEndForBooking,
   isActiveAppointment,
   isAppointmentInProgress,
 } from "@/lib/appointment-attendance";
+import {
+  formatBookingCalendarLabel,
+  formatBookingServiceLabel,
+  formatBookingTimeRange,
+} from "@/lib/booking-group";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { needsStaffApproval } from "@/lib/booking-status";
 
@@ -30,7 +35,7 @@ function getSection(booking: Booking, now = new Date()): DaySection {
   if (isPendingBooking(booking)) return "pending";
   if (booking.status === "completed") return "done";
   if (isAppointmentInProgress(booking, now)) return "now";
-  if (isActiveAppointment(booking) && getAppointmentEnd(booking.date, booking.time) < now) {
+  if (isActiveAppointment(booking) && getAppointmentEndForBooking(booking) < now) {
     return "overdue";
   }
   return "upcoming";
@@ -90,15 +95,17 @@ function MyDayRow({
           onClick={() => setExpanded((open) => !open)}
           aria-expanded={expanded}
         >
-          <span className="admin-appt-time">{booking.time}</span>
+          <span className="admin-appt-time">{formatBookingTimeRange(booking)}</span>
           <span className="min-w-0 flex-1 text-left">
             <span className="flex flex-wrap items-center gap-1.5">
-              <span className="block truncate text-sm font-semibold text-dark">{booking.name}</span>
+              <span className="block truncate text-sm font-semibold text-dark">
+                {formatBookingCalendarLabel(booking)}
+              </span>
               {clinicStatus === "new" && (
                 <span className="admin-patient-badge admin-patient-badge-new">New</span>
               )}
             </span>
-            <span className="block truncate text-xs text-muted">{booking.service}</span>
+            <span className="block truncate text-xs text-muted">{formatBookingServiceLabel(booking)}</span>
           </span>
           <ChevronDown
             className={`size-4 shrink-0 text-muted transition-transform ${expanded ? "rotate-180" : ""}`}

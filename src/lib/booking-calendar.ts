@@ -3,6 +3,7 @@ import type { ClinicOperatingSettings } from "./clinic-settings";
 import type { ClinicDentist } from "./dentists";
 import type { ScheduleBlock } from "./schedule-block-utils";
 import { getClinicTodayString } from "./clinic-timezone";
+import { filterBookingsInMonth } from "./bookings-index";
 import { getTimeSlotOptionsForDentist } from "./dentist-availability";
 import { isOperatingDayClosed } from "./booking-availability";
 
@@ -74,6 +75,7 @@ export function getMonthBookingAvailability(
   excludeToken?: string
 ): BookingDayAvailability[] {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const monthBookings = filterBookingsInMonth(bookings, year, month);
   const results: BookingDayAvailability[] = [];
 
   for (let day = 1; day <= daysInMonth; day += 1) {
@@ -83,7 +85,7 @@ export function getMonthBookingAvailability(
         date,
         minBookableDate,
         settings,
-        bookings,
+        monthBookings,
         blocks,
         dentists,
         dentistId,

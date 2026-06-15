@@ -1,15 +1,10 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { booking, placeholders } from "@/content";
 import { FadeIn } from "@/components/ui/FadeIn";
 import { ImagePlaceholder } from "@/components/ui/ImagePlaceholder";
 import { SectionLabel } from "@/components/ui/SectionLabel";
-
-const BookingForm = dynamic(
-  () => import("@/components/booking/BookingForm").then((mod) => mod.BookingForm),
-  { ssr: false, loading: () => <div className="h-96 animate-pulse rounded-2xl bg-gray-100" /> }
-);
+import { BookingTypePanel } from "@/components/sections/BookingTypePanel";
 
 export function BookingSection() {
   return (
@@ -42,9 +37,7 @@ export function BookingSection() {
             </FadeIn>
 
             <FadeIn delay={150}>
-              <div className="rounded-2xl bg-white p-6 shadow-xl md:p-8">
-                <BookingForm />
-              </div>
+              <BookingTypePanel />
             </FadeIn>
           </div>
         </div>

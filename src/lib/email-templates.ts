@@ -1,6 +1,13 @@
 import { site } from "@/content";
 import { placeholders } from "@/content/placeholders";
 import type { Booking } from "./bookings";
+import {
+  formatBookingServiceLabel,
+  formatBookingTimeRange,
+  formatGroupAttendeesList,
+  formatGroupBookingLabel,
+  isGroupBooking,
+} from "./booking-group";
 import { buildConfirmUrl, buildManageUrl, getSiteUrl } from "./site-url";
 
 const brand = site.brand;
@@ -137,14 +144,26 @@ export function bookingDetailRows(booking: Booking): Array<{ label: string; valu
     booking.assignedDentistName ??
     booking.preferredDentistName ??
     (booking.preferredDentistId ? undefined : "Any doctor");
-  const rows = [
-    { label: "Patient", value: booking.name },
-    { label: "Email", value: booking.email },
-    { label: "Phone", value: booking.phone },
-    { label: "Service", value: booking.service },
-    { label: "Date", value: formatDisplayDate(booking.date) },
-    { label: "Time", value: booking.time },
-  ];
+  const isGroup = isGroupBooking(booking);
+  const rows = isGroup
+    ? [
+        { label: "Type", value: formatGroupBookingLabel(booking) },
+        { label: "Organizer", value: booking.name },
+        { label: "Email", value: booking.email },
+        { label: "Phone", value: booking.phone },
+        { label: "Patients", value: formatGroupAttendeesList(booking).replace(/\n/g, ", ") },
+        { label: "Services", value: formatBookingServiceLabel(booking) },
+        { label: "Date", value: formatDisplayDate(booking.date) },
+        { label: "Time", value: formatBookingTimeRange(booking) },
+      ]
+    : [
+        { label: "Patient", value: booking.name },
+        { label: "Email", value: booking.email },
+        { label: "Phone", value: booking.phone },
+        { label: "Service", value: booking.service },
+        { label: "Date", value: formatDisplayDate(booking.date) },
+        { label: "Time", value: booking.time },
+      ];
   if (dentistName) {
     rows.push({ label: "Dentist", value: dentistName });
   }

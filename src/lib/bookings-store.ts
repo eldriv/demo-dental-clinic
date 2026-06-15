@@ -4,6 +4,13 @@ import { shouldUseNetlifyBlobs } from "./storage-env";
 
 const BLOB_STORE = "bookings";
 const BLOB_KEY = "all-bookings";
+const CACHE_TTL_MS = 15_000;
+
+let bookingsCache: { data: Booking[]; at: number } | null = null;
+
+function invalidateBookingsCache(): void {
+  bookingsCache = null;
+}
 
 async function readLocalBookings(): Promise<Booking[]> {
   const fs = await import("fs/promises");
@@ -41,10 +48,14 @@ async function writeBlobBookings(bookings: Booking[]): Promise<void> {
 }
 
 export async function getAllBookings(): Promise<Booking[]> {
-  if (shouldUseNetlifyBlobs()) {
-    return readBlobBookings();
+  const now = Date.now();
+  if (bookingsCache && now - bookingsCache.at < CACHE_TTL_MS) {
+    return bookingsCache.data;
   }
-  return readLocalBookings();
+
+  const data = shouldUseNetlifyBlobs() ? await readBlobBookings() : await readLocalBookings();
+  bookingsCache = { data, at: now };
+  return data;
 }
 
 export async function saveAllBookings(bookings: Booking[]): Promise<void> {
@@ -53,6 +64,7 @@ export async function saveAllBookings(bookings: Booking[]): Promise<void> {
   } else {
     await writeLocalBookings(bookings);
   }
+  invalidateBookingsCache();
 }
 
 export async function getBookingByToken(token: string): Promise<Booking | null> {

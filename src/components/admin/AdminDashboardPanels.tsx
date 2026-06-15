@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Calendar, ClipboardClock, PanelRightOpen } from "lucide-react";
 import type { Booking } from "@/lib/bookings";
 import { StatusBadge, formatBookingWhen } from "@/components/admin/StatusBadge";
+import { formatBookingCalendarLabel, formatBookingServiceLabel } from "@/lib/booking-group";
 
 interface AdminDashboardPanelProps {
   title: string;
@@ -20,11 +21,11 @@ function DashboardBookingRow({ booking, href }: { booking: Booking; href: string
       <Link href={href} className="admin-dash-list-item">
         <div className="flex items-start justify-between gap-2">
           <p className="min-w-0 truncate text-sm font-semibold leading-tight text-dark">
-            {booking.name}
+            {formatBookingCalendarLabel(booking)}
           </p>
           <StatusBadge booking={booking} compact />
         </div>
-        <p className="mt-0.5 truncate text-xs leading-snug text-muted">{booking.service}</p>
+        <p className="mt-0.5 truncate text-xs leading-snug text-muted">{formatBookingServiceLabel(booking)}</p>
         <p className="mt-0.5 truncate text-[11px] leading-snug text-muted/90">
           {formatBookingWhen(booking)}
           {dentistName ? ` · ${dentistName}` : ""}

@@ -99,6 +99,52 @@ export function filterBookingsForDentist(
   });
 }
 
+export function buildMonthDaySummaries(
+  bookings: Booking[],
+  blocks: ScheduleBlock[],
+  year: number,
+  month: number,
+  dentistId?: string
+): Map<string, ReturnType<typeof getDaySummary>> {
+  const prefix = `${year}-${String(month + 1).padStart(2, "0")}`;
+  const byDate = new Map<string, Booking[]>();
+
+  for (const booking of bookings) {
+    if (!booking.date.startsWith(prefix)) continue;
+    if (!CALENDAR_ACTIVE_STATUSES.includes(booking.status)) continue;
+    const list = byDate.get(booking.date);
+    if (list) list.push(booking);
+    else byDate.set(booking.date, [booking]);
+  }
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const summaries = new Map<string, ReturnType<typeof getDaySummary>>();
+
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const date = `${prefix}-${String(day).padStart(2, "0")}`;
+    let dayBookings = byDate.get(date) ?? [];
+    if (dentistId) {
+      dayBookings = filterBookingsForDentist(dayBookings, dentistId);
+    }
+
+    const clinicBlocked = isClinicWideDateBlocked(date, blocks);
+    const onLeave = dentistId ? isDateBlocked(date, blocks, dentistId) : false;
+
+    summaries.set(date, {
+      total: dayBookings.length,
+      confirmed: dayBookings.filter(
+        (b) => b.status === "confirmed" || b.status === "rescheduled" || b.status === "completed"
+      ).length,
+      pending: dayBookings.filter((b) => b.status === "pending").length,
+      blocked: clinicBlocked || onLeave,
+      clinicBlocked,
+      onLeave,
+    });
+  }
+
+  return summaries;
+}
+
 export function getDaySummary(
   bookings: Booking[],
   blocks: ScheduleBlock[],

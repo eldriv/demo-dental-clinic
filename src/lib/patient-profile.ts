@@ -60,7 +60,7 @@ function isCountableBooking(booking: Booking): boolean {
   return booking.status !== "cancelled" && booking.status !== "declined";
 }
 
-function groupBookingsByPatient(bookings: Booking[]): Map<string, Booking[]> {
+export function groupBookingsByPatient(bookings: Booking[]): Map<string, Booking[]> {
   const groups = new Map<string, Booking[]>();
 
   for (const booking of bookings) {

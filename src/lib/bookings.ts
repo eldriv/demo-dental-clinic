@@ -1,5 +1,12 @@
 export type BookingSource = "web" | "staff";
 
+export type BookingKind = "individual" | "group";
+
+export interface GroupAttendee {
+  name: string;
+  service: string;
+}
+
 export interface BookingAuditEntry {
   at: string;
   actor: string;
@@ -16,6 +23,11 @@ export interface Booking {
   service: string;
   date: string;
   time: string;
+  /** End time for group blocks (staff-only). */
+  endTime?: string;
+  bookingKind?: BookingKind;
+  partySize?: number;
+  attendees?: GroupAttendee[];
   status: "pending" | "confirmed" | "cancelled" | "rescheduled" | "declined" | "completed";
   createdAt: string;
   updatedAt: string;
@@ -59,6 +71,10 @@ export interface StaffCreateBookingInput extends CreateBookingInput {
   assignedDentistId: string;
   autoConfirm?: boolean;
   internalNotes?: string;
+  bookingKind?: BookingKind;
+  endTime?: string;
+  attendees?: GroupAttendee[];
+  partySize?: number;
 }
 
 export interface RescheduleBookingInput {

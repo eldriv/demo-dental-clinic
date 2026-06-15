@@ -23,11 +23,18 @@ import {
   getDayCellSurfaceClass,
   getDayCellToneClass,
   getDaySummary,
+  buildMonthDaySummaries,
   getMonthGrid,
   isPastDate,
   toDateString,
 } from "@/lib/admin-calendar";
 import { isAnyDentist } from "@/lib/dentist-availability";
+import {
+  formatBookingCalendarLabel,
+  formatBookingServiceLabel,
+  formatBookingTimeRange,
+  isGroupBooking,
+} from "@/lib/booking-group";
 
 interface AdminCalendarViewProps {
   initialBookings: Booking[];
@@ -62,6 +69,11 @@ export function AdminCalendarView({
   const monthGrid = useMemo(
     () => getMonthGrid(viewYear, viewMonth),
     [viewYear, viewMonth]
+  );
+
+  const monthSummaries = useMemo(
+    () => buildMonthDaySummaries(initialBookings, initialBlocks, viewYear, viewMonth, selectedDentistId || undefined),
+    [initialBookings, initialBlocks, viewYear, viewMonth, selectedDentistId]
   );
 
   const selectedBookings = useMemo(() => {
@@ -172,12 +184,9 @@ export function AdminCalendarView({
               }
 
               const dateString = toDateString(date);
-              const summary = getDaySummary(
-                initialBookings,
-                initialBlocks,
-                dateString,
-                selectedDentistId || undefined
-              );
+              const summary =
+                monthSummaries.get(dateString) ??
+                getDaySummary(initialBookings, initialBlocks, dateString, selectedDentistId || undefined);
               const isSelected = selectedDate === dateString && !isPastDate(dateString, todayString);
               const isToday = dateString === todayString;
               const isPast = isPastDate(dateString, todayString);
@@ -292,22 +301,22 @@ export function AdminCalendarView({
                     {slot.state === "blocked" && "Blocked / on leave"}
                     {slot.state === "in-operation" && slot.booking && (
                       <span className="wrap-break-word font-medium">
-                        In session · {slot.booking.name} · {slot.booking.service}
+                        In session · {formatBookingCalendarLabel(slot.booking)} · {formatBookingServiceLabel(slot.booking)}
                       </span>
                     )}
                     {slot.state === "booked" && slot.booking && (
                       <span className="wrap-break-word">
-                        Confirmed · {slot.booking.name} · {slot.booking.service}
+                        Confirmed · {formatBookingCalendarLabel(slot.booking)} · {formatBookingServiceLabel(slot.booking)}
                       </span>
                     )}
                     {slot.state === "completed" && slot.booking && (
                       <span className="wrap-break-word">
-                        Completed · {slot.booking.name} · {slot.booking.service}
+                        Completed · {formatBookingCalendarLabel(slot.booking)} · {formatBookingServiceLabel(slot.booking)}
                       </span>
                     )}
                     {slot.state === "pending" && slot.booking && (
                       <span className="wrap-break-word">
-                        Pending · {slot.booking.name} · {slot.booking.service}
+                        Pending · {formatBookingCalendarLabel(slot.booking)} · {formatBookingServiceLabel(slot.booking)}
                         {isAnyDentist(slot.booking.preferredDentistId) ? " · Any doctor" : ""}
                       </span>
                     )}
@@ -330,9 +339,9 @@ export function AdminCalendarView({
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="font-semibold text-dark">{entry.name}</p>
+                        <p className="font-semibold text-dark">{formatBookingCalendarLabel(entry)}</p>
                         <p className="text-sm text-muted">
-                          {entry.time} · {entry.service}
+                          {formatBookingTimeRange(entry)} · {formatBookingServiceLabel(entry)}
                           {entry.assignedDentistName ||
                           entry.preferredDentistName ||
                           findDentistName(dentists, entry.assignedDentistId) ||
@@ -352,7 +361,9 @@ export function AdminCalendarView({
                       </div>
                       <StatusBadge booking={entry} />
                     </div>
-                    <p className="mt-2 text-xs text-muted">{entry.email}</p>
+                    <p className="mt-2 text-xs text-muted">
+                      {isGroupBooking(entry) ? `Organizer: ${entry.email}` : entry.email}
+                    </p>
                   </div>
                 ))}
               </div>

@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, Clock, UserCheck } from "lucide-react";
 import type { Booking } from "@/lib/bookings";
-import { formatBookingWhen, StatusBadge } from "@/components/admin/StatusBadge";
+import { formatBookingCalendarLabel } from "@/lib/booking-group";
 import { needsNoShowAlert } from "@/lib/appointment-attendance";
 import { getBookingSource } from "@/lib/bookings";
+import { StatusBadge, formatBookingWhen } from "@/components/admin/StatusBadge";
 
 interface AdminMorningBoardProps {
   bookings: Booking[];
@@ -60,7 +61,7 @@ export function AdminMorningBoard({ bookings }: AdminMorningBoardProps) {
                       <span className="text-sm font-semibold">{booking.time}</span>
                       <StatusBadge booking={booking} compact />
                     </div>
-                    <p className="mt-1 truncate text-sm font-medium">{booking.name}</p>
+                    <p className="mt-1 truncate text-sm font-medium">{formatBookingCalendarLabel(booking)}</p>
                     <p className="truncate text-xs opacity-80">
                       {booking.service}
                       {booking.assignedDentistName ? ` · ${booking.assignedDentistName}` : ""}

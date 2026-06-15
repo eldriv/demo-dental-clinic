@@ -6,10 +6,17 @@ import type { ClinicDentist } from "./dentists";
 import type { ScheduleBlock } from "./schedule-block-utils";
 import { isClinicWideDateBlocked, isDateBlocked } from "./schedule-block-utils";
 import { isRescheduledPatient } from "./booking-status";
+import { getBookingsOnDate } from "./bookings-index";
+import {
+  getBookingTimeRangeMinutes,
+  parseTime12hToMinutes,
+  slotOverlapsMinutes,
+} from "./booking-time";
 import {
   isAppointmentInProgress,
-  slotOverlapsAppointment,
 } from "./appointment-attendance";
+
+const SLOT_DURATION_MINUTES = 30;
 
 /** Patient chose any available dentist on the booking form. */
 export const ANY_DENTIST_ID = "any";
@@ -59,20 +66,45 @@ function bookingMatchesDentist(booking: Booking, dentistId: string): boolean {
 }
 
 function hasPendingAnyAtTime(
-  bookings: Booking[],
-  date: string,
+  dayBookings: Booking[],
   time: string,
   excludeToken?: string
 ): boolean {
-  return bookings.some(
+  return dayBookings.some(
     (booking) =>
-      booking.date === date &&
       booking.time === time &&
       booking.token !== excludeToken &&
       holdsDentistSlotForBooking(booking) &&
       isAnyDentist(booking.preferredDentistId) &&
       isAnyDentist(booking.assignedDentistId)
   );
+}
+
+function slotTakenOnDay(
+  dayBookings: Booking[],
+  time: string,
+  dentistId: string,
+  excludeToken?: string,
+  mode: "booking" | "schedule" = "booking"
+): boolean {
+  const slotStartMin = parseTime12hToMinutes(time);
+
+  for (const booking of dayBookings) {
+    if (booking.token === excludeToken) continue;
+    if (!bookingMatchesDentist(booking, dentistId)) continue;
+
+    if (mode === "schedule") {
+      if (booking.time === time && blocksDentistSchedule(booking)) return true;
+      continue;
+    }
+
+    if (!holdsDentistSlotForBooking(booking)) continue;
+
+    const { start, end } = getBookingTimeRangeMinutes(booking);
+    if (slotOverlapsMinutes(slotStartMin, SLOT_DURATION_MINUTES, start, end)) return true;
+  }
+
+  return false;
 }
 
 export function isSlotTakenForDentist(
@@ -83,24 +115,7 @@ export function isSlotTakenForDentist(
   excludeToken?: string,
   mode: "booking" | "schedule" = "booking"
 ): boolean {
-  if (mode === "schedule") {
-    return bookings.some(
-      (booking) =>
-        booking.date === date &&
-        booking.time === time &&
-        booking.token !== excludeToken &&
-        blocksDentistSchedule(booking) &&
-        bookingMatchesDentist(booking, dentistId)
-    );
-  }
-
-  return bookings.some(
-    (booking) =>
-      booking.token !== excludeToken &&
-      bookingMatchesDentist(booking, dentistId) &&
-      holdsDentistSlotForBooking(booking) &&
-      slotOverlapsAppointment(date, time, booking)
-  );
+  return slotTakenOnDay(getBookingsOnDate(bookings, date), time, dentistId, excludeToken, mode);
 }
 
 export function isDentistAvailableAt(
@@ -142,10 +157,13 @@ export function isAnySlotAvailableAt(
   excludeToken?: string,
   mode: "booking" | "schedule" = "booking"
 ): boolean {
-  if (hasPendingAnyAtTime(bookings, date, time, excludeToken) && mode === "booking") {
+  const dayBookings = getBookingsOnDate(bookings, date);
+  if (hasPendingAnyAtTime(dayBookings, time, excludeToken) && mode === "booking") {
     return false;
   }
-  return getAvailableDentistsAt(bookings, blocks, date, time, dentists, excludeToken, mode).length > 0;
+  return dentists.some((dentist) =>
+    isDentistAvailableAt(bookings, blocks, date, time, dentist.id, excludeToken, mode)
+  );
 }
 
 export function getAvailableTimeSlotsForDentist(
@@ -179,7 +197,7 @@ function isTimeSlotAvailableForDentist(
   date: string,
   time: string,
   settings: ClinicOperatingSettings,
-  bookings: Booking[],
+  dayBookings: Booking[],
   blocks: ScheduleBlock[],
   dentists: ClinicDentist[],
   dentistId: string | undefined,
@@ -188,13 +206,19 @@ function isTimeSlotAvailableForDentist(
   if (isAppointmentSlotInPast(date, time)) return false;
 
   if (isAnyDentist(dentistId)) {
-    return isAnySlotAvailableAt(bookings, blocks, date, time, dentists, excludeToken, "booking");
+    if (hasPendingAnyAtTime(dayBookings, time, excludeToken)) return false;
+    return dentists.some(
+      (dentist) =>
+        !isDentistOnLeave(date, dentist.id, blocks) &&
+        !slotTakenOnDay(dayBookings, time, dentist.id, excludeToken, "booking") &&
+        isValidTimeSlot(time, settings)
+    );
   }
 
   if (isDentistOnLeave(date, dentistId!, blocks)) return false;
 
   return (
-    !isSlotTakenForDentist(bookings, date, time, dentistId!, excludeToken, "booking") &&
+    !slotTakenOnDay(dayBookings, time, dentistId!, excludeToken, "booking") &&
     isValidTimeSlot(time, settings)
   );
 }
@@ -212,6 +236,7 @@ export function getTimeSlotOptionsForDentist(
   if (isClinicWideDateBlocked(date, blocks)) return [];
 
   const baseSlots = generateTimeSlots(settings);
+  const dayBookings = getBookingsOnDate(bookings, date);
 
   return baseSlots.map((time) => ({
     time,
@@ -219,7 +244,7 @@ export function getTimeSlotOptionsForDentist(
       date,
       time,
       settings,
-      bookings,
+      dayBookings,
       blocks,
       dentists,
       dentistId,
@@ -306,24 +331,18 @@ function toTodayString(from = new Date()): string {
   return getClinicTodayString(from);
 }
 
-function findInProgressAppointment(
-  bookings: Booking[],
-  date: string,
-  time: string,
-  dentistId: string,
-  now = new Date()
+function findOverlappingBooking(
+  entries: Array<{ booking: Booking; start: number; end: number }>,
+  slotStartMin: number,
+  predicate: (booking: Booking) => boolean
 ): Booking | undefined {
-  if (date !== toTodayString(now)) return undefined;
-
-  return bookings.find(
-    (booking) =>
-      booking.date === date &&
-      bookingMatchesDentist(booking, dentistId) &&
-      blocksDentistSchedule(booking) &&
-      booking.status !== "completed" &&
-      isAppointmentInProgress(booking, now) &&
-      slotOverlapsAppointment(date, time, booking)
-  );
+  for (const entry of entries) {
+    if (!predicate(entry.booking)) continue;
+    if (slotOverlapsMinutes(slotStartMin, SLOT_DURATION_MINUTES, entry.start, entry.end)) {
+      return entry.booking;
+    }
+  }
+  return undefined;
 }
 
 export function getDentistDayAvailability(
@@ -338,31 +357,44 @@ export function getDentistDayAvailability(
   const onLeave = isDentistOnLeave(date, dentistId, blocks);
   const isPastDay = date < toTodayString(now);
 
+  const dayBookings = getBookingsOnDate(bookings, date);
+  const dentistEntries = dayBookings
+    .filter((booking) => bookingMatchesDentist(booking, dentistId))
+    .map((booking) => ({
+      booking,
+      ...getBookingTimeRangeMinutes(booking),
+    }));
+
+  const pendingAnyEntries = dayBookings
+    .filter(
+      (booking) =>
+        holdsDentistSlotForBooking(booking) &&
+        !blocksDentistSchedule(booking) &&
+        isAnyDentist(booking.preferredDentistId) &&
+        isAnyDentist(booking.assignedDentistId)
+    )
+    .map((booking) => ({
+      booking,
+      ...getBookingTimeRangeMinutes(booking),
+    }));
+
   return timeSlots.map((time) => {
     if (clinicBlocked || onLeave) {
       return { time, state: "blocked" as const };
     }
 
-    const completedBooking = bookings.find(
-      (booking) =>
-        booking.date === date &&
-        booking.time === time &&
-        isCompletedScheduleBooking(booking) &&
-        bookingMatchesDentist(booking, dentistId)
-    );
+    const slotStartMin = parseTime12hToMinutes(time);
 
+    const completedBooking = findOverlappingBooking(
+      dentistEntries,
+      slotStartMin,
+      isCompletedScheduleBooking
+    );
     if (completedBooking) {
       return { time, state: "completed" as const, booking: completedBooking };
     }
 
-    const approved = bookings.find(
-      (booking) =>
-        booking.date === date &&
-        booking.time === time &&
-        blocksDentistSchedule(booking) &&
-        bookingMatchesDentist(booking, dentistId)
-    );
-
+    const approved = findOverlappingBooking(dentistEntries, slotStartMin, blocksDentistSchedule);
     if (approved) {
       if (isAppointmentInProgress(approved, now)) {
         return { time, state: "in-operation" as const, booking: approved };
@@ -370,26 +402,18 @@ export function getDentistDayAvailability(
       return { time, state: "booked" as const, booking: approved };
     }
 
-    const pending = bookings.find(
-      (booking) =>
-        booking.date === date &&
-        booking.time === time &&
-        holdsDentistSlotForBooking(booking) &&
-        !blocksDentistSchedule(booking) &&
-        (bookingMatchesDentist(booking, dentistId) ||
-          (isAnyDentist(booking.preferredDentistId) && isAnyDentist(booking.assignedDentistId)))
-    );
-
+    const pending =
+      findOverlappingBooking(
+        dentistEntries,
+        slotStartMin,
+        (booking) => holdsDentistSlotForBooking(booking) && !blocksDentistSchedule(booking)
+      ) ??
+      findOverlappingBooking(pendingAnyEntries, slotStartMin, () => true);
     if (pending) {
       if (!isPastDay && isAppointmentSlotInPast(date, time, now)) {
         return { time, state: "past" as const, booking: pending };
       }
       return { time, state: "pending" as const, booking: pending };
-    }
-
-    const inSession = findInProgressAppointment(bookings, date, time, dentistId, now);
-    if (inSession) {
-      return { time, state: "in-operation" as const, booking: inSession };
     }
 
     if (isPastDay || isAppointmentSlotInPast(date, time, now)) {

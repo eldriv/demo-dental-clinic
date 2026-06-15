@@ -6,6 +6,7 @@ import {
   getTodayLateNotices,
   LATE_ARRIVAL_THRESHOLD_MINUTES,
 } from "@/lib/appointment-attendance";
+import { formatBookingCalendarLabel, formatBookingServiceLabel, formatBookingTimeRange } from "@/lib/booking-group";
 
 export async function GET(request: Request) {
   const session = await requireAdminSessionFromRequest(request);
@@ -16,11 +17,11 @@ export async function GET(request: Request) {
 
   const alerts = getNoShowAlerts(bookings, now).map(({ booking, minutesPastStart, hasLateNotice }) => ({
     token: booking.token,
-    name: booking.name,
+    name: formatBookingCalendarLabel(booking),
     phone: booking.phone,
-    service: booking.service,
+    service: formatBookingServiceLabel(booking),
     date: booking.date,
-    time: booking.time,
+    time: formatBookingTimeRange(booking),
     minutesPastStart,
     hasLateNotice,
     lateNoticeMinutes: booking.lateNoticeMinutes,
@@ -30,8 +31,8 @@ export async function GET(request: Request) {
 
   const lateNotices = getTodayLateNotices(bookings, now).map((booking) => ({
     token: booking.token,
-    name: booking.name,
-    time: booking.time,
+    name: formatBookingCalendarLabel(booking),
+    time: formatBookingTimeRange(booking),
     lateNoticeMinutes: booking.lateNoticeMinutes,
     lateNoticeNote: booking.lateNoticeNote,
     dentistName: booking.assignedDentistName ?? booking.preferredDentistName,

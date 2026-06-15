@@ -1,6 +1,12 @@
 import type { Booking } from "./bookings";
+import { getBookingEndTime } from "./booking-group";
 import { isRescheduledPatient } from "./booking-status";
 import { APPOINTMENT_DURATION_MINUTES } from "./clinic-settings";
+import {
+  getBookingTimeRangeMinutes,
+  parseTime12hToMinutes,
+  slotOverlapsMinutes,
+} from "./booking-time";
 
 /** Minutes after scheduled start before reception gets a no-show alert. */
 export const LATE_ARRIVAL_THRESHOLD_MINUTES = 30;
@@ -32,10 +38,33 @@ export function getAppointmentStart(date: string, time: string): Date {
   return start;
 }
 
-export function getAppointmentEnd(date: string, time: string): Date {
-  return new Date(
-    getAppointmentStart(date, time).getTime() + APPOINTMENT_DURATION_MINUTES * 60_000
-  );
+export function getAppointmentEnd(date: string, time: string, endTime?: string): Date {
+  const endTimeStr =
+    endTime ?? formatMinutesToTime12h(parseTime12hToMinutesLocal(time) + APPOINTMENT_DURATION_MINUTES);
+  const { hours, minutes } = parseTime12h(endTimeStr);
+  const end = new Date(`${date}T12:00:00`);
+  end.setHours(hours, minutes, 0, 0);
+  return end;
+}
+
+export function getAppointmentEndForBooking(
+  booking: Pick<Booking, "date" | "time" | "endTime" | "bookingKind" | "partySize">
+): Date {
+  return getAppointmentEnd(booking.date, booking.time, getBookingEndTime(booking));
+}
+
+function parseTime12hToMinutesLocal(time: string): number {
+  const { hours, minutes } = parseTime12h(time);
+  return hours * 60 + minutes;
+}
+
+function formatMinutesToTime12h(totalMinutes: number): string {
+  const hours24 = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  const period = hours24 >= 12 ? "PM" : "AM";
+  let hours12 = hours24 % 12;
+  if (hours12 === 0) hours12 = 12;
+  return `${hours12}:${String(minutes).padStart(2, "0")} ${period}`;
 }
 
 /** Confirmed visit currently in the chair (within scheduled duration). */
@@ -44,7 +73,7 @@ export function isAppointmentInProgress(booking: Booking, now = new Date()): boo
   if (booking.date !== toDateString(now)) return false;
 
   const start = getAppointmentStart(booking.date, booking.time);
-  const end = getAppointmentEnd(booking.date, booking.time);
+  const end = getAppointmentEndForBooking(booking);
   return now.getTime() >= start.getTime() && now.getTime() < end.getTime();
 }
 
@@ -56,12 +85,9 @@ export function slotOverlapsAppointment(
 ): boolean {
   if (booking.date !== date) return false;
 
-  const slotStart = getAppointmentStart(date, slotTime);
-  const slotEnd = new Date(slotStart.getTime() + slotDurationMinutes * 60_000);
-  const apptStart = getAppointmentStart(booking.date, booking.time);
-  const apptEnd = getAppointmentEnd(booking.date, booking.time);
-
-  return slotStart.getTime() < apptEnd.getTime() && slotEnd.getTime() > apptStart.getTime();
+  const slotStartMin = parseTime12hToMinutes(slotTime);
+  const { start, end } = getBookingTimeRangeMinutes(booking);
+  return slotOverlapsMinutes(slotStartMin, slotDurationMinutes, start, end);
 }
 
 export function isActiveAppointment(booking: Booking): boolean {

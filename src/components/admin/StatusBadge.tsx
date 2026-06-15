@@ -1,5 +1,6 @@
 import type { Booking } from "@/lib/bookings";
 import { getBookingStatusLabel, getBookingStatusStyle } from "@/lib/booking-status";
+import { formatBookingTimeRange } from "@/lib/booking-group";
 
 export function StatusBadge({
   booking,
@@ -18,5 +19,5 @@ export function StatusBadge({
 }
 
 export function formatBookingWhen(booking: Booking): string {
-  return `${booking.date} · ${booking.time}`;
+  return `${booking.date} · ${formatBookingTimeRange(booking)}`;
 }

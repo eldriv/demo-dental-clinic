@@ -10,6 +10,7 @@ import { getClinicSettings } from "@/lib/clinic-settings-store";
 import { getAllScheduleBlocks } from "@/lib/schedule-blocks";
 import { getAllDentists } from "@/lib/dentists-store";
 import { ANY_DENTIST_ID, validateSlotBooking } from "@/lib/booking-availability";
+import { GROUP_BOOKING_PHONE_NOTICE } from "@/lib/booking-group";
 import { isAnyDentist } from "@/lib/dentist-availability";
 
 function validateBookingFields(body: CreateBookingInput): string | null {
@@ -39,7 +40,22 @@ function validateBookingFields(body: CreateBookingInput): string | null {
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as CreateBookingInput;
+    const body = (await request.json()) as CreateBookingInput & {
+      bookingKind?: string;
+      partySize?: number;
+      attendees?: unknown[];
+      endTime?: string;
+    };
+
+    if (
+      body.bookingKind === "group" ||
+      body.partySize ||
+      (body.attendees && body.attendees.length > 0) ||
+      body.endTime
+    ) {
+      return NextResponse.json({ error: GROUP_BOOKING_PHONE_NOTICE }, { status: 400 });
+    }
+
     const fieldError = validateBookingFields(body);
 
     if (fieldError) {

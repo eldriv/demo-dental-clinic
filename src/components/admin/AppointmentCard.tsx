@@ -23,6 +23,12 @@ import {
   formatLateNoticeSummary,
   needsNoShowAlert,
 } from "@/lib/appointment-attendance";
+import {
+  formatBookingCalendarLabel,
+  formatBookingServiceLabel,
+  formatBookingTimeRange,
+  isGroupBooking,
+} from "@/lib/booking-group";
 
 type ActionName =
   | "approve"
@@ -197,11 +203,14 @@ export function AppointmentCard({ booking, onUpdated }: AppointmentCardProps) {
           onClick={() => setExpanded((open) => !open)}
           aria-expanded={expanded}
         >
-          <span className="admin-appt-time">{booking.time}</span>
+          <span className="admin-appt-time">{formatBookingTimeRange(booking)}</span>
           <span className="min-w-0 flex-1 text-left">
-            <span className="block truncate text-sm font-semibold text-dark">{booking.name}</span>
+            <span className="block truncate text-sm font-semibold text-dark">
+              {formatBookingCalendarLabel(booking)}
+            </span>
             <span className="block truncate text-xs text-muted">
-              {booking.service}
+              {formatBookingServiceLabel(booking)}
+              {isGroupBooking(booking) ? ` · Organizer: ${booking.name}` : ""}
               {dentistLabel ? ` · ${dentistLabel}` : ""}
               {source === "staff" ? " · Walk-in" : ""}
             </span>

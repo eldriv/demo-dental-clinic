@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getSessionFromCookies } from "@/lib/admin-auth";
 import { getAdminAccountById } from "@/lib/admin-accounts";
 import { listBookingsForAdmin, filterTodayForDentist } from "@/lib/admin-bookings";
-import { getPatientRecord } from "@/lib/patient-profile";
+import { groupBookingsByPatient } from "@/lib/patient-profile";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminMyDayClient } from "@/components/admin/AdminMyDayClient";
 
@@ -26,10 +26,13 @@ export default async function AdminMyDayPage() {
 
   const bookings = await listBookingsForAdmin();
   const todayBookings = filterTodayForDentist(bookings, dentistId);
+  const patientsByEmail = groupBookingsByPatient(bookings);
   const patientStatusByEmail = Object.fromEntries(
     todayBookings.map((booking) => {
-      const record = getPatientRecord(bookings, booking.email);
-      return [booking.email.trim().toLowerCase(), record?.clinicStatus ?? "new"];
+      const email = booking.email.trim().toLowerCase();
+      const patientBookings = patientsByEmail.get(email) ?? [];
+      const hasCompletedVisit = patientBookings.some((entry) => entry.status === "completed");
+      return [email, hasCompletedVisit ? "returning" : "new"] as const;
     })
   );
 

@@ -75,27 +75,38 @@ export function BookingForm({ className = "" }: BookingFormProps) {
       return;
     }
 
-    setSlotsLoading(true);
-    const params = new URLSearchParams({
-      date: selectedDate,
-      dentistId: selectedDentistId,
-    });
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setSlotsLoading(true);
+      const params = new URLSearchParams({
+        date: selectedDate,
+        dentistId: selectedDentistId,
+      });
 
-    fetch(`/api/availability?${params}`)
-      .then((res) => res.json())
-      .then((data) => {
-        setDateClosed(Boolean(data.closed));
-        const slots: TimeSlotOption[] = data.slots ?? [];
-        setTimeSlots(slots);
-        setSelectedTime((current) =>
-          slots.some((slot) => slot.time === current && slot.available) ? current : ""
-        );
-      })
-      .catch(() => {
-        setTimeSlots([]);
-        setDateClosed(false);
-      })
-      .finally(() => setSlotsLoading(false));
+      fetch(`/api/availability?${params}`, { signal: controller.signal })
+        .then((res) => res.json())
+        .then((data) => {
+          setDateClosed(Boolean(data.closed));
+          const slots: TimeSlotOption[] = data.slots ?? [];
+          setTimeSlots(slots);
+          setSelectedTime((current) =>
+            slots.some((slot) => slot.time === current && slot.available) ? current : ""
+          );
+        })
+        .catch((error) => {
+          if (error instanceof DOMException && error.name === "AbortError") return;
+          setTimeSlots([]);
+          setDateClosed(false);
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setSlotsLoading(false);
+        });
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
   }, [selectedDate, selectedDentistId]);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {

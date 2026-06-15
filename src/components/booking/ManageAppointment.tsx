@@ -14,6 +14,13 @@ import {
   formatLateNoticeSummary,
   isActiveAppointment,
 } from "@/lib/appointment-attendance";
+import {
+  formatBookingServiceLabel,
+  formatBookingTimeRange,
+  formatGroupAttendeesList,
+  formatGroupBookingLabel,
+  isGroupBooking,
+} from "@/lib/booking-group";
 import { getTodayDateString } from "@/lib/admin-booking-filters";
 
 interface ManageAppointmentProps {
@@ -282,27 +289,44 @@ export function ManageAppointment({ initialBooking }: ManageAppointmentProps) {
       )}
 
       <dl className="space-y-4">
-        {[
-          ["Name", bookingData.name],
-          ["Email", bookingData.email],
-          ["Phone", bookingData.phone],
-          ["Service", bookingData.service],
-          ["Date", bookingData.date],
-          ["Time", bookingData.time],
-          ...(bookingData.assignedDentistName ||
-          bookingData.preferredDentistName ||
-          bookingData.assignedDentistId ||
-          bookingData.preferredDentistId
-            ? [
-                [
-                  "Dentist",
-                  bookingData.assignedDentistName ??
-                    bookingData.preferredDentistName ??
-                    (isAnyDentist(bookingData.preferredDentistId) ? "Any doctor" : "Assigned at approval"),
-                ],
-              ]
-            : [["Dentist", "Any doctor"]]),
-        ].map(([label, value]) => (
+        {(isGroupBooking(bookingData)
+          ? [
+              ["Type", formatGroupBookingLabel(bookingData)],
+              ["Organizer", bookingData.name],
+              ["Email", bookingData.email],
+              ["Phone", bookingData.phone],
+              ["Patients", formatGroupAttendeesList(bookingData).replace(/\n/g, ", ")],
+              ["Services", formatBookingServiceLabel(bookingData)],
+              ["Date", bookingData.date],
+              ["Time", formatBookingTimeRange(bookingData)],
+            ]
+          : [
+              ["Name", bookingData.name],
+              ["Email", bookingData.email],
+              ["Phone", bookingData.phone],
+              ["Service", bookingData.service],
+              ["Date", bookingData.date],
+              ["Time", bookingData.time],
+            ]
+        )
+          .concat(
+            bookingData.assignedDentistName ||
+              bookingData.preferredDentistName ||
+              bookingData.assignedDentistId ||
+              bookingData.preferredDentistId
+              ? [
+                  [
+                    "Dentist",
+                    bookingData.assignedDentistName ??
+                      bookingData.preferredDentistName ??
+                      (isAnyDentist(bookingData.preferredDentistId)
+                        ? "Any doctor"
+                        : "Assigned at approval"),
+                  ],
+                ]
+              : [["Dentist", "Any doctor"]]
+          )
+          .map(([label, value]) => (
           <div key={label} className="flex justify-between gap-4 border-b border-gray-100 pb-3">
             <dt className="text-sm font-medium text-muted">{label}</dt>
             <dd className="text-sm font-semibold text-dark text-right">{value}</dd>
