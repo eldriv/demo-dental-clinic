@@ -769,7 +769,7 @@ body {
 }
 
 .admin-dentist-panel-active {
-  @apply flex items-center gap-3 border-emerald-100/80 bg-linear-to-r from-emerald-50/80 to-white;
+  @apply flex flex-wrap items-center gap-3 border-emerald-100/80 bg-linear-to-r from-emerald-50/80 to-white;
 }
 
 .admin-dentist-panel-pending {
@@ -846,6 +846,10 @@ body {
 
 .admin-dentist-revoke-link {
   @apply inline-flex items-center justify-center gap-1.5 py-1 text-xs font-medium text-slate-500 transition-colors hover:text-red-600 disabled:opacity-50;
+}
+
+.admin-dentist-revoke-access {
+  @apply ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-red-100 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50;
 }
 
 .admin-dentist-alert {

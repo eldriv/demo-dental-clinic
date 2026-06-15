@@ -312,6 +312,21 @@ export async function saveAdminAccount(account: StoredAdminAccount): Promise<voi
   accountsPromise = Promise.resolve(next);
 }
 
+export async function removeDentistAdminAccount(linkedDentistId: string): Promise<boolean> {
+  const accounts = await readStoredAccounts();
+  const next = accounts.filter(
+    (account) =>
+      !(account.role === "dentist" && account.linkedDentistId === linkedDentistId)
+  );
+
+  if (next.length === accounts.length) return false;
+
+  await writeStoredAccounts(next);
+  invalidateAdminAccountsCache();
+  accountsPromise = Promise.resolve(next);
+  return true;
+}
+
 export async function findAdminAccountByEmail(
   email: string
 ): Promise<StoredAdminAccount | undefined> {

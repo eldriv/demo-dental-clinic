@@ -3,6 +3,7 @@ import type { AdminAccount } from "@/content/admin";
 import { findAdminAccountByEmail, findAdminAccountById } from "@/lib/admin-accounts-store";
 import { verifyAdminPassword } from "@/lib/admin-password";
 import { toAdminAccount } from "@/lib/admin-accounts";
+import { getDentistById } from "@/lib/dentists-store";
 import {
   isValidLoginEmail,
   LOGIN_GENERIC_ERROR,
@@ -34,6 +35,12 @@ export async function verifySessionToken(token: string): Promise<AdminSession | 
 
   const account = await findAdminAccountById(session.sub);
   if (!account || account.status !== "active") return null;
+
+  if (account.role === "dentist" && account.linkedDentistId) {
+    const dentist = await getDentistById(account.linkedDentistId);
+    if (!dentist) return null;
+  }
+
   return session;
 }
 
@@ -61,6 +68,11 @@ export async function authenticateAdmin(
 
   if (!stored || stored.status !== "active" || !passwordValid) {
     return null;
+  }
+
+  if (stored.role === "dentist" && stored.linkedDentistId) {
+    const dentist = await getDentistById(stored.linkedDentistId);
+    if (!dentist) return null;
   }
 
   return toAdminAccount(stored);

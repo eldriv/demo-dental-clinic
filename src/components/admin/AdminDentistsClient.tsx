@@ -252,29 +252,74 @@ export function AdminDentistsClient({
     }
   }
 
-  async function handleDelete(id: string) {
+  async function handleDelete(dentist: ClinicDentist) {
+    const confirmed = window.confirm(
+      `Remove ${dentist.name} from the clinic?\n\nThis deletes their profile and revokes dashboard access. They will not be able to sign in.`
+    );
+    if (!confirmed) return;
+
     setFormError("");
     setFormMessage("");
     setInviteErrors((current) => {
       const next = { ...current };
-      delete next[id];
+      delete next[dentist.id];
       return next;
     });
 
-    const res = await fetch(`/api/admin/dentists?id=${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/admin/dentists?id=${dentist.id}`, { method: "DELETE" });
     const data = await res.json();
     if (!res.ok) {
       setInviteErrors((current) => ({
         ...current,
-        [id]: data.error ?? "Failed to remove dentist.",
+        [dentist.id]: data.error ?? "Failed to remove dentist.",
       }));
       return;
     }
 
-    setDentists((current) => current.filter((dentist) => dentist.id !== id));
-    setInvites((current) => current.filter((invite) => invite.linkedDentistId !== id));
-    setAccounts((current) => current.filter((account) => account.linkedDentistId !== id));
-    setFormMessage("Dentist removed.");
+    setDentists((current) => current.filter((entry) => entry.id !== dentist.id));
+    setInvites((current) => current.filter((invite) => invite.linkedDentistId !== dentist.id));
+    setAccounts((current) => current.filter((account) => account.linkedDentistId !== dentist.id));
+    setFormMessage(`${dentist.name} removed and dashboard access revoked.`);
+  }
+
+  async function revokeAccess(dentist: ClinicDentist) {
+    const account = accountByDentistId[dentist.id];
+    const confirmed = window.confirm(
+      `Revoke dashboard access for ${dentist.name}${account?.email ? ` (${account.email})` : ""}?\n\nThey will be signed out and unable to log in until you send a new invite.`
+    );
+    if (!confirmed) return;
+
+    setInviteLoading(dentist.id);
+    setInviteErrors((current) => ({ ...current, [dentist.id]: "" }));
+    setInviteMessages((current) => ({ ...current, [dentist.id]: "" }));
+
+    try {
+      const res = await fetch(`/api/admin/dentists/access?id=${encodeURIComponent(dentist.id)}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setInviteErrors((current) => ({
+          ...current,
+          [dentist.id]: data.error ?? "Failed to revoke access.",
+        }));
+        return;
+      }
+
+      setAccounts((current) => current.filter((entry) => entry.linkedDentistId !== dentist.id));
+      setInvites((current) => current.filter((invite) => invite.linkedDentistId !== dentist.id));
+      setInviteMessages((current) => ({
+        ...current,
+        [dentist.id]: `Dashboard access revoked for ${dentist.name}. Send a new invite when they should return.`,
+      }));
+    } catch {
+      setInviteErrors((current) => ({
+        ...current,
+        [dentist.id]: "Failed to revoke access.",
+      }));
+    } finally {
+      setInviteLoading(null);
+    }
   }
 
   async function sendInvite(dentist: ClinicDentist, retry = false) {
@@ -344,7 +389,17 @@ export function AdminDentistsClient({
     }
   }
 
-  async function revokeInvite(token: string, dentistId: string) {
+  async function revokeInvite(
+    token: string,
+    dentistId: string,
+    email: string,
+    dentistName: string
+  ) {
+    const confirmed = window.confirm(
+      `Revoke the invite for ${email}?\n\nThe invite link will stop working. You can send a new invite to ${dentistName} later.`
+    );
+    if (!confirmed) return;
+
     setInviteLoading(token);
     setInviteErrors((current) => ({ ...current, [dentistId]: "" }));
     setInviteMessages((current) => ({ ...current, [dentistId]: "" }));
@@ -472,7 +527,7 @@ export function AdminDentistsClient({
                     </div>
                     <button
                       type="button"
-                      onClick={() => handleDelete(dentist.id)}
+                      onClick={() => handleDelete(dentist)}
                       className="admin-dentist-delete"
                       aria-label={`Remove ${dentist.name}`}
                     >
@@ -489,6 +544,19 @@ export function AdminDentistsClient({
                         <p className="font-medium text-dark">Dashboard access active</p>
                         <p className="mt-0.5 truncate text-sm text-muted">{account.email}</p>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => revokeAccess(dentist)}
+                        disabled={inviteLoading === dentist.id}
+                        className="admin-dentist-revoke-access"
+                      >
+                        {inviteLoading === dentist.id ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <XCircle className="size-3.5" />
+                        )}
+                        Revoke access
+                      </button>
                     </div>
                   ) : invite ? (
                     <div className="admin-dentist-panel admin-dentist-panel-pending">
@@ -517,7 +585,9 @@ export function AdminDentistsClient({
                         <CopyInviteLinkButton token={invite.token} fullWidth />
                         <button
                           type="button"
-                          onClick={() => revokeInvite(invite.token, dentist.id)}
+                          onClick={() =>
+                            revokeInvite(invite.token, dentist.id, invite.email, dentist.name)
+                          }
                           disabled={inviteLoading === invite.token}
                           className="admin-dentist-revoke-link"
                         >

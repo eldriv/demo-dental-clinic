@@ -168,3 +168,21 @@ export async function revokeDentistInvite(token: string): Promise<DentistInvite 
   await writeStoredInvites(invites);
   return invites[index];
 }
+
+export async function revokeAllInvitesForDentist(linkedDentistId: string): Promise<number> {
+  const invites = await readStoredInvites();
+  let revoked = 0;
+  const next = invites.map((invite) => {
+    if (invite.linkedDentistId === linkedDentistId && invite.status === "pending") {
+      revoked += 1;
+      return { ...invite, status: "revoked" as const };
+    }
+    return invite;
+  });
+
+  if (revoked > 0) {
+    await writeStoredInvites(next);
+  }
+
+  return revoked;
+}

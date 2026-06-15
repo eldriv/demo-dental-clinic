@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { isSessionGuard, requireAdminSessionFromRequest } from "@/lib/admin-guard";
+import { isSessionGuard, requireOwnerSessionFromRequest } from "@/lib/admin-guard";
+import { revokeDentistDashboardAccess } from "@/lib/admin-dentist-access";
 import { addDentist, deleteDentist, getAllDentists } from "@/lib/dentists-store";
 
 export async function GET(request: Request) {
-  const session = await requireAdminSessionFromRequest(request);
+  const session = await requireOwnerSessionFromRequest(request);
   if (isSessionGuard(session)) return session;
 
   const dentists = await getAllDentists();
@@ -11,7 +12,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const session = await requireAdminSessionFromRequest(request);
+  const session = await requireOwnerSessionFromRequest(request);
   if (isSessionGuard(session)) return session;
 
   try {
@@ -25,7 +26,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const session = await requireAdminSessionFromRequest(request);
+  const session = await requireOwnerSessionFromRequest(request);
   if (isSessionGuard(session)) return session;
 
   const { searchParams } = new URL(request.url);
@@ -35,6 +36,7 @@ export async function DELETE(request: Request) {
   }
 
   try {
+    await revokeDentistDashboardAccess(id);
     await deleteDentist(id);
     return NextResponse.json({ success: true });
   } catch (error) {
