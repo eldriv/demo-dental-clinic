@@ -132,14 +132,23 @@ export async function deleteDentist(id: string): Promise<void> {
   const { getAllScheduleBlocks } = await import("./schedule-blocks");
 
   const [bookings, blocks] = await Promise.all([getAllBookings(), getAllScheduleBlocks()]);
-  const hasBookings = bookings.some((booking) => booking.assignedDentistId === id);
-  const hasBlocks = blocks.some((block) => block.providerId === id);
+  const today = new Date().toISOString().slice(0, 10);
+  const hasBookings = bookings.some(
+    (booking) =>
+      booking.assignedDentistId === id &&
+      booking.status !== "cancelled" &&
+      booking.status !== "declined"
+  );
+  const hasBlocks = blocks.some(
+    (block) =>
+      block.providerId === id &&
+      (block.endDate ? block.endDate >= today : block.date >= today)
+  );
 
   if (hasBookings || hasBlocks) {
     throw new Error(
-      "This dentist has appointments or leave dates on record. Remove leave blocks first, or keep the profile if past bookings exist."
+      "This dentist has upcoming appointments or an active leave date on record. Reassign or cancel those first, then try deleting again."
     );
-  }
 
   await writeStoredDentists(dentists.filter((entry) => entry.id !== id));
 }
